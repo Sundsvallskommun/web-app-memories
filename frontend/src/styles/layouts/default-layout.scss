@@ -1,0 +1,21 @@
+.DefaultLayout {
+  .main-container {
+    @apply flex;
+
+    .container {
+      @apply mx-auto;
+    }
+
+    main {
+      @apply flex flex-col flex-grow border border-gray-middle border-none;
+    }
+  }
+
+  .main-content-padding {
+    @apply pt-[30px] pb-20 md:px-lg w-full flex flex-col grow;
+  }
+
+  .next-link-a {
+    @apply sr-only focus:not-sr-only bg-inverted-background-content border-2 border-black p-4 text-inverted-body inline-block focus:absolute focus:top-0 focus:left-0 focus:right-0 focus:m-auto focus:w-80 text-center;
+  }
+}

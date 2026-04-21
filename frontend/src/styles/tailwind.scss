@@ -1,0 +1,10 @@
+@use 'tailwindcss/base';
+@use 'tailwindcss/components';
+@use 'tailwindcss/utilities';
+
+@use '../../public/fonts/fonts.css';
+
+@use './app-base.scss';
+@use './app-utilities.scss';
+@use './app-components.scss';
+@use './layouts/default-layout.scss';

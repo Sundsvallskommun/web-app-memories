@@ -1,0 +1,11 @@
+{
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended", "next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error"
+  },
+  "env": {
+    "node": true,
+    "browser": true,
+    "jest": true
+  }
+}

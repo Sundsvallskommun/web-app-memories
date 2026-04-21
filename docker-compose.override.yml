@@ -1,0 +1,27 @@
+version: '3'
+services:
+  backend:
+    environment:
+      # Required
+      # prefix for routes
+      BASE_URL_PREFIX: ${BASE_URL_PREFIX:?err}
+      # URL to the Sundsvalls Kommun API
+      API_BASE_URL: ${API_BASE_URL:?err}
+      # Used for API auth
+      CLIENT_KEY: ${CLIENT_KEY:?err}
+      CLIENT_SECRET: ${CLIENT_SECRET:?err}
+      # Used for session encryption
+      SECRET_KEY: ${SECRET_KEY:?err}
+      # Used for CORS - should contain the domain of frontend
+      ORIGIN: ${ORIGIN:?err}
+      # Optionals
+      MUNICIPALITY_ID: ${MUNICIPALITY_ID-2281}
+      SESSION_STORE: ${SESSION_STORE-memory}
+      NODE_ENV: ${NODE_ENV-production}
+      LOG_FORMAT: ${LOG_FORMAT-dev}
+      LOG_DIR: ${LOG_DIR-./data/logs}
+      CREDENTIALS: ${CREDENTIALS-true}
+  frontend:
+    environment:
+      # URL to backend
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?err}

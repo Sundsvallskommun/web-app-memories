@@ -1,0 +1,19 @@
+@layer components {
+  .container {
+    @apply px-8 lg:px-0;
+  }
+
+  .form-error-message {
+    @apply mb-4;
+  }
+
+  .max-width-content {
+    @apply max-w-screen-desktop-max;
+  }
+
+  .header-container .header-content,
+  .TabMenu > .tab-wrapper,
+  .container {
+    @apply max-width-content;
+  }
+}
