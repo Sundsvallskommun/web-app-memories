@@ -37,6 +37,20 @@ export interface Publication {
   xmltext: string | null;
 }
 
+export interface Audio {
+  audioId: number;
+  filename: string | null;
+  objectFilePath: string | null;
+  objectType: string | null;
+  date: string | null;
+  documentTitle: string | null;
+  locationText: string | null;
+  location: string | null;
+  subject: string | null;
+  comment: string | null;
+  audioMimeType: string | null;
+}
+
 export interface Photo {
   photoId: number;
   filename: string | null;
@@ -242,6 +256,34 @@ export const mapPhotoToDocument = (photo: Photo): Document => ({
 
 export const mapPhotosToDocuments = (photos: Photo[]): Document[] => photos.map(mapPhotoToDocument);
 
+const buildAudioFiles = (audio: Audio): DocumentFile[] | undefined => {
+  const path = audio.objectFilePath || audio.filename;
+  if (!path) return undefined;
+  const filename = path.replace(/\\/g, '/').split('/').pop() || path;
+  return [
+    {
+      filename,
+      format: audio.audioMimeType || 'unknown',
+      size: '',
+    },
+  ];
+};
+
+export const mapAudioToDocument = (audio: Audio): Document => ({
+  id: `audio-${audio.audioId}`,
+  title: audio.documentTitle || '',
+  type: 'Audio',
+  year: parseYear(audio.date),
+  ort: opt(audio.locationText),
+  plats: opt(audio.location),
+  location: pickLocation(audio.location, audio.locationText),
+  creator: opt(audio.subject) || '',
+  description: audio.comment || '',
+  files: buildAudioFiles(audio),
+});
+
+export const mapAudiosToDocuments = (audios: Audio[]): Document[] => audios.map(mapAudioToDocument);
+
 export interface PagingMetaData {
   page: number;
   limit: number;
@@ -262,5 +304,10 @@ export interface PagedPublicationResponse {
 
 export interface PagedPhotoResponse {
   photos: Photo[];
+  _meta: PagingMetaData;
+}
+
+export interface PagedAudioResponse {
+  audios: Audio[];
   _meta: PagingMetaData;
 }

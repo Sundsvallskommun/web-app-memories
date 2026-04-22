@@ -1,10 +1,11 @@
-export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object';
+export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object' | 'Audio';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Film: 'Film',
   Publication: 'Publikation',
   Photo: 'Foto',
   Object: 'Föremål',
+  Audio: 'Ljud',
 };
 
 export interface DocumentFile {
@@ -65,4 +66,5 @@ export interface SearchResult {
   publicationTotal: number;
   photoTotal: number;
   objectTotal: number;
+  audioTotal: number;
 }

@@ -6,10 +6,13 @@ import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
 import { logger } from '@utils/logger';
 import {
+  Audio,
   Document,
   Film,
   Photo,
   Publication,
+  mapAudioToDocument,
+  mapAudiosToDocuments,
   mapFilmToDocument,
   mapFilmsToDocuments,
   mapPhotoToDocument,
@@ -39,7 +42,7 @@ import {
 // set. Cap at MAX_CACHE_KEYS entries with LRU eviction so worst-case memory
 // stays bounded regardless of distinct queries.
 
-type SourceKey = 'film' | 'publication' | 'photo' | 'object';
+type SourceKey = 'film' | 'publication' | 'photo' | 'object' | 'audio';
 
 interface SourceCacheEntry {
   documents: Document[];
@@ -221,6 +224,14 @@ export class DocumentController {
           docs = mapPhotosToDocuments(items);
           break;
         }
+        case 'audio': {
+          const items = await this.fetchAllPages<Audio>(
+            page => `${base}/${MUNICIPALITY_ID}/audios${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
+            'audios',
+          );
+          docs = mapAudiosToDocuments(items);
+          break;
+        }
       }
     } catch (e) {
       logger.warn(`Failed to populate cache for source=${source} query=${query || ''}: ${(e as Error).message}`);
@@ -244,6 +255,7 @@ export class DocumentController {
         this.fetchSource('publication', undefined),
         this.fetchSource('photo', undefined),
         this.fetchSource('object', undefined),
+        this.fetchSource('audio', undefined),
       ]);
       logger.info(`Document cache warm complete in ${Date.now() - t0}ms`);
     } catch (e) {
@@ -272,11 +284,12 @@ export class DocumentController {
 
     // Always warm all four sources so chip counts stay accurate even when a
     // type filter is selected.
-    const [films, publications, photos, objects] = await Promise.all([
+    const [films, publications, photos, objects, audios] = await Promise.all([
       this.fetchSource('film', trimmedQuery),
       this.fetchSource('publication', trimmedQuery),
       this.fetchSource('photo', trimmedQuery),
       this.fetchSource('object', trimmedQuery),
+      this.fetchSource('audio', trimmedQuery),
     ]);
 
     // Type filter narrows which cache slice we paginate over.
@@ -294,8 +307,11 @@ export class DocumentController {
       case 'Object':
         docs = [...objects];
         break;
+      case 'Audio':
+        docs = [...audios];
+        break;
       default:
-        docs = [...films, ...publications, ...photos, ...objects];
+        docs = [...films, ...publications, ...photos, ...objects, ...audios];
     }
 
     if (sortBy) sortDocuments(docs, sortBy, sortDirection || 'desc');
@@ -315,6 +331,7 @@ export class DocumentController {
       publicationTotal: publications.length,
       photoTotal: photos.length,
       objectTotal: objects.length,
+      audioTotal: audios.length,
       page: safePage,
       pageSize: safePageSize,
       message: 'success',
@@ -348,6 +365,12 @@ export class DocumentController {
       return response.send({ data: mapPhotoToDocument(res.data), message: 'success' });
     }
 
+    if (id.startsWith('audio-')) {
+      const audioId = this.extractNumericId(id, 'audio-');
+      const res = await this.apiService.get<Audio>({ url: `${base}/${MUNICIPALITY_ID}/audios/${audioId}` });
+      return response.send({ data: mapAudioToDocument(res.data), message: 'success' });
+    }
+
     const filmId = this.extractNumericId(id.startsWith('film-') ? id : `film-${id}`, 'film-');
     const res = await this.apiService.get<Film>({ url: `${base}/${MUNICIPALITY_ID}/films/${filmId}` });
     return response.send({ data: mapFilmToDocument(res.data), message: 'success' });
@@ -371,6 +394,8 @@ export class DocumentController {
       url = `${base}/${MUNICIPALITY_ID}/publications/${this.extractNumericId(id, 'publ-')}/file?variant=${v}`;
     } else if (id.startsWith('photo-')) {
       url = `${base}/${MUNICIPALITY_ID}/photos/${this.extractNumericId(id, 'photo-')}/file?variant=${v}`;
+    } else if (id.startsWith('audio-')) {
+      url = `${base}/${MUNICIPALITY_ID}/audios/${this.extractNumericId(id, 'audio-')}/file`;
     } else {
       url = `${base}/${MUNICIPALITY_ID}/films/${this.extractNumericId(id.startsWith('film-') ? id : `film-${id}`, 'film-')}/file`;
     }

@@ -18,6 +18,7 @@ const typeIcons: Record<string, React.ReactNode> = {
   Karta: <Image size={20} />,
   Ritning: <Image size={20} />,
   Ljud: <Music size={20} />,
+  Audio: <Music size={20} />,
   Film: <Video size={20} />,
   Object: <Package size={20} />,
 };

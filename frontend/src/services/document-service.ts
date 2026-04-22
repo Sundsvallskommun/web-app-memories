@@ -9,6 +9,7 @@ interface ApiResponse {
   publicationTotal: number;
   photoTotal: number;
   objectTotal: number;
+  audioTotal: number;
   page: number;
   pageSize: number;
   message: string;
@@ -40,6 +41,7 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
     publicationTotal: data?.publicationTotal || 0,
     photoTotal: data?.photoTotal || 0,
     objectTotal: data?.objectTotal || 0,
+    audioTotal: data?.audioTotal || 0,
   };
 };
 

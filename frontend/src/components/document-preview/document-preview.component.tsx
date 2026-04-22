@@ -55,6 +55,16 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
     setFailed(false);
   }, [doc.id, variants]);
 
+  if (doc.type === 'Audio') {
+    return (
+      <div className="bg-background-200 rounded-cards p-md flex justify-center" data-cy="document-preview-audio">
+        <audio controls src={apiURL(`documents/${doc.id}/file`)} className="w-full max-w-2xl">
+          Din webbläsare stödjer inte ljuduppspelning.
+        </audio>
+      </div>
+    );
+  }
+
   if (!isImageType(doc.type)) return null;
   if (!selected) return null;
 
