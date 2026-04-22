@@ -1,12 +1,12 @@
 # Sundsvallsminnen
 
-Webbgränssnitt för sökning i Sundsvalls minnes-arkiv — filmer, publikationer, fotografier och föremål.
+Webbgränssnitt för sökning i Sundsvalls minnes-arkiv — filmer, publikationer, fotografier, föremål och ljud.
 
 ## APIer som används
 
 | API      | Version |
 | -------- | ------: |
-| Memories |     3.0 |
+| Memories |     3.1 |
 
 Applikationsanvändaren i WSO2 måste prenumerera på detta API.
 
@@ -71,7 +71,7 @@ Frontend körs på `http://localhost:3000`, backend (BFF) på `http://localhost:
 ## Arkitektur
 
 - **`frontend/`** — Next.js 15 App Router, TypeScript, @sk-web-gui/react 3.x
-- **`backend/`** — Express BFF som proxyar och cachar anrop mot Memories-API:t (v3.0). Cache är in-memory med 30 min TTL per källa × sökfråga.
+- **`backend/`** — Express BFF som proxyar och cachar anrop mot Memories-API:t (v3.1). Cache är in-memory med 30 min TTL per källa × sökfråga.
 
 ## Synka datamodeller
 
