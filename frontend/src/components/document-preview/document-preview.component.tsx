@@ -4,14 +4,18 @@ import { useEffect, useState } from 'react';
 import { Document } from '@data-contracts/document';
 import { apiURL } from '@utils/api-url';
 
-// Inline preview for a Document. Renders an <img> using the largest available
-// variant for Foto / Publikation / Föremål. Film records are not previewed —
-// the upstream archive stores them as .avi which no browser plays natively;
-// users get the metadata + download button instead.
+// Inline preview for a Document. Renders an <img> using the thumbnail variant
+// for Foto / Publikation / Föremål. Film records are not previewed — the
+// upstream archive stores them as .avi which no browser plays natively; users
+// get the metadata + download button instead.
 //
-// No click-to-zoom: `large` IS the highest-resolution source we can serve.
-// Any in-page modal or new-tab open would just render the same pixels at the
-// same size. Users who want the file itself can use the download button below.
+// Why the thumbnail and not the large image:
+//   - Thumbnails load fast (often < 50 KB) — snappy detail page.
+//   - Our render size is capped at max-h-[80vh]; at typical viewports the
+//     difference between thumbnail and large is imperceptible for most
+//     records.
+//   - Users who genuinely want the full-resolution file use the "Stor bild"
+//     download button below.
 //
 // On image load failure (e.g. samba file missing) we swap to a Swedish
 // placeholder instead of leaving the broken-image icon visible.
@@ -22,10 +26,12 @@ const fileUrl = (docId: string, variant?: string): string => {
 };
 
 const pickImageVariant = (doc: Document): string | undefined => {
-  // Prefer "large" for inline display; fall back to "thumbnail" if that's all we have.
+  // Prefer "thumbnail" — fast to load and visually indistinguishable at our
+  // max-h-[80vh] render size. Fall back to "large" only if no thumbnail
+  // exists (rare; most records have both).
   const variants = (doc.files ?? []).map((f) => f.variant).filter(Boolean) as string[];
-  if (variants.includes('large')) return 'large';
   if (variants.includes('thumbnail')) return 'thumbnail';
+  if (variants.includes('large')) return 'large';
   return undefined;
 };
 
