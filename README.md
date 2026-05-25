@@ -71,7 +71,7 @@ Frontend körs på `http://localhost:3000`, backend (BFF) på `http://localhost:
 ## Arkitektur
 
 - **`frontend/`** — Next.js 15 App Router, TypeScript, @sk-web-gui/react 3.x
-- **`backend/`** — Express BFF som proxyar och cachar anrop mot Memories-API:t (v3.1). Cache är in-memory med 30 min TTL per källa × sökfråga.
+- **`backend/`** — Express BFF som proxyar och cachar anrop mot Memories-API:t (v3.2). Cache är in-memory med 30 min TTL per källa × sökfråga.
 
 ## Synka datamodeller
 

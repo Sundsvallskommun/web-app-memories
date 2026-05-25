@@ -1,4 +1,4 @@
-import { Controller, Get, Param, QueryParam, Res } from 'routing-controllers';
+import { Controller, Get, HeaderParam, Param, QueryParam, Res } from 'routing-controllers';
 import { Response } from 'express';
 import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
@@ -383,7 +383,12 @@ export class DocumentController {
    * the same way Logbook OOMs the upstream when it wraps the response.
    */
   @Get('/documents/:id/file')
-  async getDocumentFile(@Param('id') id: string, @QueryParam('variant') variant: string, @Res() response: Response) {
+  async getDocumentFile(
+    @Param('id') id: string,
+    @QueryParam('variant') variant: string,
+    @HeaderParam('range') range: string,
+    @Res() response: Response,
+  ) {
     const base = getApiBase('memories');
 
     // Default to `large` for image-bearing sources; films have no variants on the upstream API.
@@ -400,13 +405,67 @@ export class DocumentController {
       url = `${base}/${MUNICIPALITY_ID}/films/${this.extractNumericId(id.startsWith('film-') ? id : `film-${id}`, 'film-')}/file`;
     }
 
-    const upstream = await this.apiService.getRaw({ url, responseType: 'stream' });
-    // Forward the headers that drive download/inline behaviour. Don't set
-    // Content-Type ourselves — upstream knows the right MIME for film vs jpeg.
-    for (const header of ['content-type', 'content-disposition', 'content-length']) {
+    // Forward the browser's Range header so upstream can respond with a 206
+    // partial-content slice. Without this, <audio>/<video> elements can't
+    // compute duration or seek — they just stream until buffering catches up
+    // and the scrubber shows "buffered so far" instead of the clip length.
+    const upstream = await this.apiService.getRaw({
+      url,
+      responseType: 'stream',
+      headers: range ? { Range: range } : undefined,
+      // Accept 206 Partial Content in addition to 200.
+      validateStatus: status => status >= 200 && status < 300,
+    });
+
+    // Forward the headers that drive download / seek / inline playback.
+    // Don't set Content-Type ourselves — upstream knows the right MIME.
+    for (const header of ['content-type', 'content-disposition', 'content-length', 'accept-ranges', 'content-range']) {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
+    // Preserve 206 when upstream serves a partial response.
+    response.status(upstream.status);
+    (upstream.data as NodeJS.ReadableStream).pipe(response);
+    return response;
+  }
+
+  /**
+   * Inline-playback stream for audio and film. Proxies to upstream's dedicated
+   * `/stream` endpoint (Memories 3.2+) which serves `Content-Disposition: inline`
+   * and `Accept-Ranges: bytes`, honouring the browser's `Range` header so the
+   * <audio>/<video> element can compute duration and seek.
+   *
+   * Separate from `/file` so the download button keeps getting a proper
+   * `attachment` disposition, while media previews get seekable inline playback.
+   */
+  @Get('/documents/:id/stream')
+  async streamDocument(
+    @Param('id') id: string,
+    @HeaderParam('range') range: string,
+    @Res() response: Response,
+  ) {
+    const base = getApiBase('memories');
+    let url: string;
+    if (id.startsWith('audio-')) {
+      url = `${base}/${MUNICIPALITY_ID}/audios/${this.extractNumericId(id, 'audio-')}/stream`;
+    } else if (id.startsWith('film-')) {
+      url = `${base}/${MUNICIPALITY_ID}/films/${this.extractNumericId(id, 'film-')}/stream`;
+    } else {
+      throw new HttpException(400, `No stream available for document id: ${id}`);
+    }
+
+    const upstream = await this.apiService.getRaw({
+      url,
+      responseType: 'stream',
+      headers: range ? { Range: range } : undefined,
+      validateStatus: status => status >= 200 && status < 300,
+    });
+
+    for (const header of ['content-type', 'content-disposition', 'content-length', 'accept-ranges', 'content-range']) {
+      const value = upstream.headers[header];
+      if (value) response.setHeader(header, value as string);
+    }
+    response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
     return response;
   }
