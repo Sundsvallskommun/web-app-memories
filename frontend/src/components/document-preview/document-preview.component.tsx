@@ -58,7 +58,7 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
   if (doc.type === 'Audio') {
     return (
       <div className="bg-background-200 rounded-cards p-md flex justify-center" data-cy="document-preview-audio">
-        <audio controls src={apiURL(`documents/${doc.id}/file`)} className="w-full max-w-2xl">
+        <audio controls preload="metadata" src={apiURL(`documents/${doc.id}/stream`)} className="w-full max-w-2xl">
           Din webbläsare stödjer inte ljuduppspelning.
         </audio>
       </div>

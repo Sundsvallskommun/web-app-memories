@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/config';
 
-export const APIS = [{ name: 'memories', version: '3.1' }] as const;
+export const APIS = [{ name: 'memories', version: '3.2' }] as const;
 
 export type ApiName = (typeof APIS)[number]['name'];
 
