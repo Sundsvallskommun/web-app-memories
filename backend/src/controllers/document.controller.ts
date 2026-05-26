@@ -435,8 +435,10 @@ export class DocumentController {
    * and `Accept-Ranges: bytes`, honouring the browser's `Range` header so the
    * <audio>/<video> element can compute duration and seek.
    *
-   * Separate from `/file` so the download button keeps getting a proper
-   * `attachment` disposition, while media previews get seekable inline playback.
+   * Separate from `/file` because audio/film `/file` still returns an
+   * `attachment` disposition for downloads, whereas `/stream` enables
+   * seekable inline playback. (Photos and publications get `inline`
+   * on `/file` directly so the browser can render them in-page.)
    */
   @Get('/documents/:id/stream')
   async streamDocument(

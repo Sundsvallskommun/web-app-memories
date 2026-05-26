@@ -2,33 +2,38 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@sk-web-gui/react';
-import { Document } from '@data-contracts/document';
+import { Document, DocumentFile } from '@data-contracts/document';
 import { apiURL } from '@utils/api-url';
 
-// Inline preview for a Document. Renders an <img> for Foto / Publikation /
-// Föremål records. Film records are not previewed — the upstream archive
-// stores them as .avi which no browser plays natively; users get the metadata
-// + download button instead.
+// Inline preview for a Document. Renders the best fit for each record:
+//   * <img>     — image variants of Photo / Publication / Object
+//   * <iframe>  — PDF large-variant for Publication, and the transformed
+//                  HTML served from variant=text on Publication
+//   * <audio>   — Audio records
+//   * nothing   — Film (upstream .avi is not browser-playable; the user
+//                  gets metadata + download button instead)
 //
-// When both `large` and `thumbnail` variants exist we default to `large`
-// (better-looking at max-h-[80vh]) and expose a small switch so the user can
-// flip to `thumbnail` if they want a faster-loading version (useful on mobile
-// / slow links).
-//
-// On image load failure (e.g. samba file missing) we swap to a Swedish
-// placeholder instead of leaving the broken-image icon visible.
+// PDFs are detected by filename extension since the backend doesn't expose
+// MIME on the Document model. Browsers render application/pdf inline
+// natively when the API sets Content-Disposition: inline.
 
 type Variant = 'large' | 'thumbnail';
 
-const fileUrl = (docId: string, variant: Variant): string => apiURL(`documents/${docId}/file?variant=${variant}`);
+const fileUrl = (docId: string, variant: string): string => apiURL(`documents/${docId}/file?variant=${variant}`);
 
 const isImageType = (type: string): boolean => type === 'Photo' || type === 'Publication' || type === 'Object';
 
-const availableVariants = (doc: Document): Variant[] => {
-  const variants = (doc.files ?? []).map((f) => f.variant).filter(Boolean) as string[];
+const findFile = (doc: Document, variant: string): DocumentFile | undefined =>
+  (doc.files ?? []).find((f) => f.variant === variant);
+
+const isPdfFilename = (filename: string | undefined): boolean =>
+  !!filename && filename.toLowerCase().endsWith('.pdf');
+
+const imageVariants = (doc: Document): Variant[] => {
   const out: Variant[] = [];
-  if (variants.includes('large')) out.push('large');
-  if (variants.includes('thumbnail')) out.push('thumbnail');
+  const large = findFile(doc, 'large');
+  if (large && !isPdfFilename(large.filename)) out.push('large');
+  if (findFile(doc, 'thumbnail')) out.push('thumbnail');
   return out;
 };
 
@@ -42,19 +47,6 @@ interface Props {
 }
 
 export const DocumentPreview: React.FC<Props> = ({ doc }) => {
-  const variants = useMemo(() => availableVariants(doc), [doc]);
-  // Default to the best-looking option available; fall through to whatever
-  // exists if `large` isn't there.
-  const defaultVariant: Variant | undefined = variants[0];
-  const [selected, setSelected] = useState<Variant | undefined>(defaultVariant);
-  const [failed, setFailed] = useState(false);
-
-  // Reset state when the doc changes (navigating between records).
-  useEffect(() => {
-    setSelected(variants[0]);
-    setFailed(false);
-  }, [doc.id, variants]);
-
   if (doc.type === 'Audio') {
     return (
       <div className="bg-background-200 rounded-cards p-md flex justify-center" data-cy="document-preview-audio">
@@ -66,6 +58,61 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
   }
 
   if (!isImageType(doc.type)) return null;
+
+  const largeFile = findFile(doc, 'large');
+  const textFile = doc.type === 'Publication' ? findFile(doc, 'text') : undefined;
+  const largeIsPdf = isPdfFilename(largeFile?.filename);
+  const textIsPdf = isPdfFilename(textFile?.filename);
+  const pdfVariant: Variant | 'text' | undefined = largeIsPdf ? 'large' : textIsPdf ? 'text' : undefined;
+  const showImage = !largeIsPdf && imageVariants(doc).length > 0;
+  // HtmlPreview is only for transformed text/XML; if the text variant is a PDF
+  // we show it via PdfPreview instead (sandbox on HtmlPreview blocks the
+  // browser's built-in PDF viewer from rendering).
+  const showText = !!textFile && !textIsPdf;
+
+  if (!pdfVariant && !showImage && !showText) return null;
+
+  return (
+    <div className="flex flex-col gap-md" data-cy="document-preview">
+      {pdfVariant && <PdfPreview docId={doc.id} title={doc.title} variant={pdfVariant} />}
+      {showImage && <ImagePreview doc={doc} />}
+      {showText && <HtmlPreview docId={doc.id} title={doc.title} />}
+    </div>
+  );
+};
+
+const PdfPreview: React.FC<{ docId: string; title: string; variant: string }> = ({ docId, title, variant }) => (
+  <div className="bg-background-200 rounded-cards p-md" data-cy="preview-pdf">
+    <iframe
+      src={fileUrl(docId, variant)}
+      title={title || 'PDF-förhandsvisning'}
+      className="w-full h-[80vh] rounded-cards bg-white"
+    />
+  </div>
+);
+
+const HtmlPreview: React.FC<{ docId: string; title: string }> = ({ docId, title }) => (
+  <div className="bg-background-200 rounded-cards p-md" data-cy="preview-text">
+    <iframe
+      src={fileUrl(docId, 'text')}
+      title={title ? `${title} (text)` : 'Textförhandsvisning'}
+      sandbox="allow-same-origin"
+      className="w-full h-[60vh] rounded-cards bg-white"
+    />
+  </div>
+);
+
+const ImagePreview: React.FC<{ doc: Document }> = ({ doc }) => {
+  const variants = useMemo(() => imageVariants(doc), [doc]);
+  const [selected, setSelected] = useState<Variant | undefined>(variants[0]);
+  const [failed, setFailed] = useState(false);
+
+  // Reset state when the doc changes (navigating between records).
+  useEffect(() => {
+    setSelected(variants[0]);
+    setFailed(false);
+  }, [doc.id, variants]);
+
   if (!selected) return null;
 
   if (failed) {
@@ -80,7 +127,7 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
   }
 
   return (
-    <div className="bg-background-200 rounded-cards p-md flex flex-col items-center gap-sm" data-cy="document-preview">
+    <div className="bg-background-200 rounded-cards p-md flex flex-col items-center gap-sm">
       <img
         src={fileUrl(doc.id, selected)}
         alt={doc.title || 'Förhandsvisning'}
@@ -89,7 +136,7 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
         onError={() => setFailed(true)}
       />
 
-      {/* Only show the switch when the record has more than one variant —
+      {/* Only show the switch when the record has more than one image variant —
           otherwise there's nothing to toggle between. */}
       {variants.length > 1 && (
         <div

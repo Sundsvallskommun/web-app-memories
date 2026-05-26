@@ -155,13 +155,51 @@ const pickLocation = (...candidates: (string | null | undefined)[]): string => {
   return '';
 };
 
+const formatLabel = (filename: string, fallback: string): string => {
+  const ext = filename.toLowerCase().split('.').pop();
+  switch (ext) {
+    case 'pdf':
+      return 'PDF';
+    case 'xml':
+      return 'XML';
+    case 'jpg':
+    case 'jpeg':
+      return 'JPEG';
+    case 'png':
+      return 'PNG';
+    case 'tif':
+    case 'tiff':
+      return 'TIFF';
+    case 'txt':
+      return 'Text';
+    default:
+      return fallback;
+  }
+};
+
 const buildPublicationFiles = (pub: Publication): DocumentFile[] | undefined => {
   const files: DocumentFile[] = [];
   if (pub.largeImageFilename)
-    files.push({ filename: pub.largeImageFilename, format: 'Stor bild', size: '', variant: 'large' });
+    files.push({
+      filename: pub.largeImageFilename,
+      format: formatLabel(pub.largeImageFilename, 'Stor bild'),
+      size: '',
+      variant: 'large',
+    });
   if (pub.thumbnailFilename)
-    files.push({ filename: pub.thumbnailFilename, format: 'Miniatyr', size: '', variant: 'thumbnail' });
-  if (pub.ocrFilename) files.push({ filename: pub.ocrFilename, format: 'Text/XML', size: '', variant: 'text' });
+    files.push({
+      filename: pub.thumbnailFilename,
+      format: formatLabel(pub.thumbnailFilename, 'Miniatyr'),
+      size: '',
+      variant: 'thumbnail',
+    });
+  if (pub.ocrFilename)
+    files.push({
+      filename: pub.ocrFilename,
+      format: formatLabel(pub.ocrFilename, 'Text'),
+      size: '',
+      variant: 'text',
+    });
   return files.length > 0 ? files : undefined;
 };
 
