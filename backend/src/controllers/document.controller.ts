@@ -11,6 +11,7 @@ import {
   Film,
   Photo,
   Publication,
+  Text,
   mapAudioToDocument,
   mapAudiosToDocuments,
   mapFilmToDocument,
@@ -19,6 +20,8 @@ import {
   mapPhotosToDocuments,
   mapPublicationToDocument,
   mapPublicationsToDocuments,
+  mapTextToDocument,
+  mapTextsToDocuments,
 } from './document.mapper';
 
 // ============================================================================
@@ -42,7 +45,7 @@ import {
 // set. Cap at MAX_CACHE_KEYS entries with LRU eviction so worst-case memory
 // stays bounded regardless of distinct queries.
 
-type SourceKey = 'film' | 'publication' | 'photo' | 'object' | 'audio';
+type SourceKey = 'film' | 'publication' | 'photo' | 'object' | 'audio' | 'text';
 
 interface SourceCacheEntry {
   documents: Document[];
@@ -232,6 +235,14 @@ export class DocumentController {
           docs = mapAudiosToDocuments(items);
           break;
         }
+        case 'text': {
+          const items = await this.fetchAllPages<Text>(
+            page => `${base}/${MUNICIPALITY_ID}/texts${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
+            'texts',
+          );
+          docs = mapTextsToDocuments(items);
+          break;
+        }
       }
     } catch (e) {
       logger.warn(`Failed to populate cache for source=${source} query=${query || ''}: ${(e as Error).message}`);
@@ -256,6 +267,7 @@ export class DocumentController {
         this.fetchSource('photo', undefined),
         this.fetchSource('object', undefined),
         this.fetchSource('audio', undefined),
+        this.fetchSource('text', undefined),
       ]);
       logger.info(`Document cache warm complete in ${Date.now() - t0}ms`);
     } catch (e) {
@@ -282,14 +294,15 @@ export class DocumentController {
   ) {
     const trimmedQuery = query?.trim() || undefined;
 
-    // Always warm all four sources so chip counts stay accurate even when a
+    // Always warm all sources so chip counts stay accurate even when a
     // type filter is selected.
-    const [films, publications, photos, objects, audios] = await Promise.all([
+    const [films, publications, photos, objects, audios, texts] = await Promise.all([
       this.fetchSource('film', trimmedQuery),
       this.fetchSource('publication', trimmedQuery),
       this.fetchSource('photo', trimmedQuery),
       this.fetchSource('object', trimmedQuery),
       this.fetchSource('audio', trimmedQuery),
+      this.fetchSource('text', trimmedQuery),
     ]);
 
     // Type filter narrows which cache slice we paginate over.
@@ -310,8 +323,11 @@ export class DocumentController {
       case 'Audio':
         docs = [...audios];
         break;
+      case 'Text':
+        docs = [...texts];
+        break;
       default:
-        docs = [...films, ...publications, ...photos, ...objects, ...audios];
+        docs = [...films, ...publications, ...photos, ...objects, ...audios, ...texts];
     }
 
     if (sortBy) sortDocuments(docs, sortBy, sortDirection || 'desc');
@@ -332,6 +348,7 @@ export class DocumentController {
       photoTotal: photos.length,
       objectTotal: objects.length,
       audioTotal: audios.length,
+      textTotal: texts.length,
       page: safePage,
       pageSize: safePageSize,
       message: 'success',
@@ -371,6 +388,12 @@ export class DocumentController {
       return response.send({ data: mapAudioToDocument(res.data), message: 'success' });
     }
 
+    if (id.startsWith('text-')) {
+      const textId = this.extractNumericId(id, 'text-');
+      const res = await this.apiService.get<Text>({ url: `${base}/${MUNICIPALITY_ID}/texts/${textId}` });
+      return response.send({ data: mapTextToDocument(res.data), message: 'success' });
+    }
+
     const filmId = this.extractNumericId(id.startsWith('film-') ? id : `film-${id}`, 'film-');
     const res = await this.apiService.get<Film>({ url: `${base}/${MUNICIPALITY_ID}/films/${filmId}` });
     return response.send({ data: mapFilmToDocument(res.data), message: 'success' });
@@ -392,13 +415,15 @@ export class DocumentController {
     const base = getApiBase('memories');
 
     // Default to `large` for image-bearing sources; films have no variants on the upstream API.
-    const defaultVariant = id.startsWith('publ-') || id.startsWith('photo-') ? 'large' : '';
+    const defaultVariant = id.startsWith('publ-') || id.startsWith('photo-') || id.startsWith('text-') ? 'large' : '';
     const v = variant || defaultVariant;
     let url: string;
     if (id.startsWith('publ-')) {
       url = `${base}/${MUNICIPALITY_ID}/publications/${this.extractNumericId(id, 'publ-')}/file?variant=${v}`;
     } else if (id.startsWith('photo-')) {
       url = `${base}/${MUNICIPALITY_ID}/photos/${this.extractNumericId(id, 'photo-')}/file?variant=${v}`;
+    } else if (id.startsWith('text-')) {
+      url = `${base}/${MUNICIPALITY_ID}/texts/${this.extractNumericId(id, 'text-')}/file?variant=${v}`;
     } else if (id.startsWith('audio-')) {
       url = `${base}/${MUNICIPALITY_ID}/audios/${this.extractNumericId(id, 'audio-')}/file`;
     } else {
@@ -430,6 +455,46 @@ export class DocumentController {
   }
 
   /**
+   * Pipe an extra media-file image (Text / TEXT_MULTI) through the proxy. Only
+   * valid for `text-` documents; the upstream serves these from a dedicated
+   * per-media endpoint (`/texts/{id}/media/{mediaId}/file`) added in memories 3.4.
+   */
+  @Get('/documents/:id/media/:mediaId/file')
+  async getDocumentMediaFile(
+    @Param('id') id: string,
+    @Param('mediaId') mediaId: string,
+    @QueryParam('variant') variant: string,
+    @Res() response: Response,
+  ) {
+    if (!id.startsWith('text-')) {
+      throw new HttpException(400, `No media files available for document id: ${id}`);
+    }
+    if (!/^\d+$/.test(mediaId)) {
+      throw new HttpException(400, `Invalid media file id: ${mediaId}`);
+    }
+
+    const base = getApiBase('memories');
+    const textId = this.extractNumericId(id, 'text-');
+    const v = variant || 'large';
+    const url = `${base}/${MUNICIPALITY_ID}/texts/${textId}/media/${mediaId}/file?variant=${v}`;
+
+    const upstream = await this.apiService.getRaw({
+      url,
+      responseType: 'stream',
+      validateStatus: status => status >= 200 && status < 300,
+    });
+
+    // Don't set Content-Type ourselves — upstream knows the right MIME.
+    for (const header of ['content-type', 'content-disposition', 'content-length']) {
+      const value = upstream.headers[header];
+      if (value) response.setHeader(header, value as string);
+    }
+    response.status(upstream.status);
+    (upstream.data as NodeJS.ReadableStream).pipe(response);
+    return response;
+  }
+
+  /**
    * Inline-playback stream for audio and film. Proxies to upstream's dedicated
    * `/stream` endpoint (Memories 3.2+) which serves `Content-Disposition: inline`
    * and `Accept-Ranges: bytes`, honouring the browser's `Range` header so the
@@ -441,11 +506,7 @@ export class DocumentController {
    * on `/file` directly so the browser can render them in-page.)
    */
   @Get('/documents/:id/stream')
-  async streamDocument(
-    @Param('id') id: string,
-    @HeaderParam('range') range: string,
-    @Res() response: Response,
-  ) {
+  async streamDocument(@Param('id') id: string, @HeaderParam('range') range: string, @Res() response: Response) {
     const base = getApiBase('memories');
     let url: string;
     if (id.startsWith('audio-')) {

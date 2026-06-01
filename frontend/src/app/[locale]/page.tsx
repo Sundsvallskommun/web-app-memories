@@ -17,7 +17,7 @@ import { Search, X, ArrowUpDown } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, DocumentType, SearchParams, SearchResult } from '@data-contracts/document';
 import { searchDocuments } from '@services/document-service';
 
-const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio'];
+const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
 const SORT_KEYS = ['year', 'title', 'location'] as const;
 type SortBy = (typeof SORT_KEYS)[number];
 type SortDirection = 'asc' | 'desc';
@@ -165,6 +165,7 @@ const SearchPage: React.FC = () => {
     if (type === 'Photo') return result.photoTotal;
     if (type === 'Object') return result.objectTotal;
     if (type === 'Audio') return result.audioTotal;
+    if (type === 'Text') return result.textTotal;
     return 0;
   };
 
@@ -175,7 +176,7 @@ const SearchPage: React.FC = () => {
           {/* Search field */}
           <div>
             <h1 className="text-h2-sm md:text-h2-md mb-md">Sök i Sundsvallsminnen</h1>
-            <p className="text-body mb-lg">Sök bland filmer, publikationer, fotografier, föremål och ljud i Sundsvalls arkiv.</p>
+            <p className="text-body mb-lg">Sök bland filmer, publikationer, fotografier, föremål, ljud och texter i Sundsvalls arkiv.</p>
 
             <div className="flex gap-sm items-end">
               <div className="flex-grow">

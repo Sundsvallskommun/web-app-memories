@@ -9,6 +9,8 @@ import { ArrowLeft, Download, FileText, Image, Music, Video, Package } from 'luc
 import { DOCUMENT_TYPE_LABELS, Document, DocumentType } from '@data-contracts/document';
 import { getDocumentById } from '@services/document-service';
 import { DocumentPreview } from '@components/document-preview/document-preview.component';
+import { DocumentGallery } from '@components/document-gallery/document-gallery.component';
+import { DocumentRelated } from '@components/document-related/document-related.component';
 import { DocumentMeta } from '@components/document-meta/document-meta.component';
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -132,6 +134,10 @@ const DocumentDetailPage: React.FC = () => {
               fallback so a missing samba file doesn't break layout. */}
           <DocumentPreview doc={doc} />
 
+          {/* Gallery of extra media files (Text / TEXT_MULTI). Renders nothing
+              for documents without attached media. */}
+          <DocumentGallery doc={doc} />
+
           {/* Metadata in legacy field order (matches sok.sundsvallsminnen.se). */}
           <div className="bg-background-200 rounded-cards p-lg">
             <h2 className="text-label-medium mb-md">Uppgifter</h2>
@@ -181,6 +187,10 @@ const DocumentDetailPage: React.FC = () => {
               </Table>
             </div>
           )}
+
+          {/* Related photos (FOTO_FOTO) — navigates to each linked record.
+              Renders nothing for documents without related ids. */}
+          <DocumentRelated doc={doc} />
         </div>
       </Main>
     </DefaultLayout>
