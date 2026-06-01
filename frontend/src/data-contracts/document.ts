@@ -1,4 +1,4 @@
-export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object' | 'Audio';
+export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object' | 'Audio' | 'Text';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Film: 'Film',
@@ -6,6 +6,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Photo: 'Foto',
   Object: 'Föremål',
   Audio: 'Ljud',
+  Text: 'Text',
 };
 
 export interface DocumentFile {
@@ -13,6 +14,15 @@ export interface DocumentFile {
   format: string;
   size: string;
   variant?: string;
+}
+
+// An extra media file (Text / TEXT_MULTI) shown in the detail-page gallery.
+// `variants` lists which of thumbnail/large/original the archive has, so the
+// gallery only requests files that exist. Fetched via
+// /documents/:id/media/:id/file?variant=...
+export interface DocumentMediaItem {
+  id: number;
+  variants: string[];
 }
 
 export interface PublicationCitation {
@@ -45,6 +55,11 @@ export interface Document {
   source?: string;
   archiveReference?: string;
   files?: DocumentFile[];
+  // Extra media files (Text records) rendered as a gallery on the detail page.
+  media?: DocumentMediaItem[];
+  // Composite ids of related documents (Photo / FOTO_FOTO). Each links to its
+  // own detail page from the "Relaterade foton" strip.
+  relatedIds?: string[];
 }
 
 export interface SearchParams {
@@ -67,4 +82,5 @@ export interface SearchResult {
   photoTotal: number;
   objectTotal: number;
   audioTotal: number;
+  textTotal: number;
 }

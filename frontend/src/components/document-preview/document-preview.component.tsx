@@ -21,7 +21,8 @@ type Variant = 'large' | 'thumbnail';
 
 const fileUrl = (docId: string, variant: string): string => apiURL(`documents/${docId}/file?variant=${variant}`);
 
-const isImageType = (type: string): boolean => type === 'Photo' || type === 'Publication' || type === 'Object';
+const isImageType = (type: string): boolean =>
+  type === 'Photo' || type === 'Publication' || type === 'Object' || type === 'Text';
 
 const findFile = (doc: Document, variant: string): DocumentFile | undefined =>
   (doc.files ?? []).find((f) => f.variant === variant);
@@ -60,7 +61,7 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
   if (!isImageType(doc.type)) return null;
 
   const largeFile = findFile(doc, 'large');
-  const textFile = doc.type === 'Publication' ? findFile(doc, 'text') : undefined;
+  const textFile = doc.type === 'Publication' || doc.type === 'Text' ? findFile(doc, 'text') : undefined;
   const largeIsPdf = isPdfFilename(largeFile?.filename);
   const textIsPdf = isPdfFilename(textFile?.filename);
   const pdfVariant: Variant | 'text' | undefined = largeIsPdf ? 'large' : textIsPdf ? 'text' : undefined;

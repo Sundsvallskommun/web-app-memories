@@ -73,6 +73,33 @@ export interface Photo {
   rights: string | null;
   accessionNumber: string | null;
   referenceCode: string | null;
+  // IDs of related photos via FOTO_FOTO. Only populated on detail lookup.
+  relatedPhotoIds: number[] | null;
+}
+
+export interface TextMediaFile {
+  id: number;
+  thumbnailFilename: string | null;
+  largeImageFilename: string | null;
+  originalFilename: string | null;
+}
+
+export interface Text {
+  textId: number;
+  filename: string | null;
+  documentDate: string | null;
+  documentEndDate: string | null;
+  documentTitle: string | null;
+  locationText: string | null;
+  location: string | null;
+  subjectId: number | null;
+  subject: string | null;
+  comment: string | null;
+  thumbnailFilename: string | null;
+  largeImageFilename: string | null;
+  ocrFilename: string | null;
+  xmltext: string | null;
+  mediaFiles: TextMediaFile[] | null;
 }
 
 export interface DocumentFile {
@@ -80,6 +107,15 @@ export interface DocumentFile {
   format: string;
   size: string;
   variant?: string;
+}
+
+// A single extra media item (TEXT_MULTI) addressable via the upstream
+// /texts/{id}/media/{mediaId}/file endpoint. `variants` lists which of
+// thumbnail/large/original the upstream has a filename for, so the frontend
+// only requests variants that actually exist.
+export interface DocumentMediaItem {
+  id: number;
+  variants: string[];
 }
 
 export interface PublicationCitation {
@@ -116,6 +152,11 @@ export interface Document {
   source?: string;
   archiveReference?: string;
   files?: DocumentFile[];
+  // Extra media files (Text / TEXT_MULTI) shown as a gallery on the detail page.
+  media?: DocumentMediaItem[];
+  // Composite ids of related documents (Photo / FOTO_FOTO), shown as a
+  // "related" strip on the detail page. Each links to its own detail page.
+  relatedIds?: string[];
 }
 
 // The upstream DB uses literal "3000" (and similar future-year strings) as a
@@ -290,6 +331,12 @@ export const mapPhotoToDocument = (photo: Photo): Document => ({
   description: photoDescription(photo),
   source: photo.rights || undefined,
   files: buildPhotoFiles(photo),
+  // FOTO_FOTO links point at other photo records, each addressable via the same
+  // `photo-` prefix (objects share it too). Only present on detail lookup.
+  relatedIds:
+    photo.relatedPhotoIds && photo.relatedPhotoIds.length > 0
+      ? photo.relatedPhotoIds.map(relatedId => `photo-${relatedId}`)
+      : undefined,
 });
 
 export const mapPhotosToDocuments = (photos: Photo[]): Document[] => photos.map(mapPhotoToDocument);
@@ -322,6 +369,51 @@ export const mapAudioToDocument = (audio: Audio): Document => ({
 
 export const mapAudiosToDocuments = (audios: Audio[]): Document[] => audios.map(mapAudioToDocument);
 
+// Text (memoirs / "minnen") is structurally like Publication: it carries primary
+// thumbnail/large images plus an OCR `text` variant (XML transformed to HTML by
+// the upstream). On detail lookup it also carries extra TEXT_MULTI media files.
+const buildTextFiles = (text: Text): DocumentFile[] | undefined => {
+  const files: DocumentFile[] = [];
+  if (text.largeImageFilename)
+    files.push({ filename: text.largeImageFilename, format: 'Stor bild', size: '', variant: 'large' });
+  if (text.thumbnailFilename)
+    files.push({ filename: text.thumbnailFilename, format: 'Miniatyr', size: '', variant: 'thumbnail' });
+  if (text.ocrFilename) files.push({ filename: text.ocrFilename, format: 'Text/XML', size: '', variant: 'text' });
+  return files.length > 0 ? files : undefined;
+};
+
+// Map the extra TEXT_MULTI media files (only present on detail lookup) to gallery
+// items, recording which image variants each one has so the frontend only
+// requests files that actually exist upstream.
+const buildTextMedia = (text: Text): DocumentMediaItem[] | undefined => {
+  const media = (text.mediaFiles ?? [])
+    .map(m => {
+      const variants: string[] = [];
+      if (m.thumbnailFilename) variants.push('thumbnail');
+      if (m.largeImageFilename) variants.push('large');
+      if (m.originalFilename) variants.push('original');
+      return { id: m.id, variants };
+    })
+    .filter(item => item.variants.length > 0);
+  return media.length > 0 ? media : undefined;
+};
+
+export const mapTextToDocument = (text: Text): Document => ({
+  id: `text-${text.textId}`,
+  title: text.documentTitle || '',
+  type: 'Text',
+  year: parseYear(text.documentDate),
+  ort: opt(text.locationText),
+  plats: opt(text.location),
+  location: pickLocation(text.location, text.locationText),
+  creator: opt(text.subject) || '',
+  description: text.comment || '',
+  files: buildTextFiles(text),
+  media: buildTextMedia(text),
+});
+
+export const mapTextsToDocuments = (texts: Text[]): Document[] => texts.map(mapTextToDocument);
+
 export interface PagingMetaData {
   page: number;
   limit: number;
@@ -347,5 +439,10 @@ export interface PagedPhotoResponse {
 
 export interface PagedAudioResponse {
   audios: Audio[];
+  _meta: PagingMetaData;
+}
+
+export interface PagedTextResponse {
+  texts: Text[];
   _meta: PagingMetaData;
 }
