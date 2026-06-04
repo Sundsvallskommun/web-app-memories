@@ -287,10 +287,10 @@ const SearchPage: React.FC = () => {
             {!loading && result && result.documents.length > 0 && (
               <Table scrollable={false}>
                 <Table.Header>
-                  <Table.HeaderColumn className="w-[60%]">Titel</Table.HeaderColumn>
-                  <Table.HeaderColumn className="w-[12%]">Typ</Table.HeaderColumn>
                   <Table.HeaderColumn className="w-[8%]">År</Table.HeaderColumn>
+                  <Table.HeaderColumn className="w-[60%]">Titel</Table.HeaderColumn>
                   <Table.HeaderColumn className="w-[20%]">Plats</Table.HeaderColumn>
+                  <Table.HeaderColumn className="w-[12%]">Typ</Table.HeaderColumn>
                 </Table.Header>
                 <Table.Body>
                   {result.documents.map((doc) => (
@@ -299,14 +299,14 @@ const SearchPage: React.FC = () => {
                       className="cursor-pointer hover:bg-background-200"
                       onClick={() => router.push(`/dokument/${doc.id}`)}
                     >
+                      <Table.Column>{doc.year || '—'}</Table.Column>
                       <Table.Column>
                         <p className="font-bold line-clamp-2">{doc.title || '(Utan titel)'}</p>
                       </Table.Column>
+                      <Table.Column className="break-words">{doc.location}</Table.Column>
                       <Table.Column>
                         <Chip>{DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type}</Chip>
                       </Table.Column>
-                      <Table.Column>{doc.year || '—'}</Table.Column>
-                      <Table.Column className="break-words">{doc.location}</Table.Column>
                     </Table.Row>
                   ))}
                 </Table.Body>
