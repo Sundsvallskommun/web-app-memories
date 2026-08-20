@@ -6,7 +6,7 @@ Webbgränssnitt för sökning i Sundsvalls minnes-arkiv — filmer, publikatione
 
 | API      | Version |
 | -------- | ------: |
-| Memories |     3.4 |
+| Memories |     3.5 |
 
 Applikationsanvändaren i WSO2 måste prenumerera på detta API.
 
