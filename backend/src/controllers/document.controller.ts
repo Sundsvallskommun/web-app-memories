@@ -50,9 +50,14 @@ type SourceKey = 'film' | 'publication' | 'photo' | 'object' | 'audio' | 'text';
 interface SourceCacheEntry {
   documents: Document[];
   fetchedAt: number;
+  /** True when some upstream pages were lost (throttling) and the set is incomplete. */
+  partial: boolean;
 }
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes — archive doesn't change often
+// A partial set is still worth serving — stale-but-something beats an empty grid —
+// but it should be refreshed far sooner than a complete one.
+const PARTIAL_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 const MAX_CACHE_KEYS = 16; // ~4 sources × 4 distinct queries
 const sourceCache = new Map<string, SourceCacheEntry>();
 
@@ -97,7 +102,10 @@ interface UpstreamMeta {
   totalPages: number;
 }
 
-const UPSTREAM_PAGE_LIMIT = 500; // chunk size when warming the cache
+// 1000 is the gateway's hard ceiling ("Page limit cannot be greater than 1000").
+// Use all of it: the per-minute request quota, not payload size, is the binding
+// constraint, so halving the page count halves the cost of a full warm.
+const UPSTREAM_PAGE_LIMIT = 1000;
 const FETCH_CONCURRENCY = 8;
 
 const buildUpstreamQuery = (
@@ -135,28 +143,43 @@ export class DocumentController {
 
   /**
    * Fetch every page of an upstream collection, in parallel batches, and
-   * concatenate. Returns the raw upstream items (not yet mapped to Document).
+   * concatenate. Returns the raw upstream items (not yet mapped to Document)
+   * alongside the count of pages that could not be retrieved.
+   *
+   * A single failed page must not cost the whole collection: publications is
+   * 20k+ records across ~21 pages, and losing all of it because page 17 was
+   * throttled leaves the UI empty. Failures are tolerated per page and reported
+   * so the caller can shorten the cache lifetime instead.
    */
-  private async fetchAllPages<T>(buildUrl: (page: number) => string, itemsKey: string): Promise<T[]> {
-    // First page tells us the total count.
+  private async fetchAllPages<T>(
+    buildUrl: (page: number) => string,
+    itemsKey: string,
+  ): Promise<{ items: T[]; missingPages: number }> {
+    // First page tells us the total count. This one is not optional — without it
+    // we don't know how far the collection runs.
     const first = await this.apiService.get<Record<string, unknown> & { _meta?: UpstreamMeta }>({ url: buildUrl(1) });
     const items: T[] = [...((first.data[itemsKey] as T[] | undefined) ?? [])];
     const totalPages = first.data._meta?.totalPages ?? 1;
-    if (totalPages <= 1) return items;
+    if (totalPages <= 1) return { items, missingPages: 0 };
 
     // Fetch the rest concurrently to keep cache-warm time tolerable.
+    let missingPages = 0;
     const remaining = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
     for (let i = 0; i < remaining.length; i += FETCH_CONCURRENCY) {
       const batch = remaining.slice(i, i + FETCH_CONCURRENCY);
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         batch.map(page => this.apiService.get<Record<string, unknown>>({ url: buildUrl(page) })),
       );
       for (const r of results) {
-        const list = r.data[itemsKey] as T[] | undefined;
+        if (r.status === 'rejected') {
+          missingPages++;
+          continue;
+        }
+        const list = r.value.data[itemsKey] as T[] | undefined;
         if (list && list.length > 0) items.push(...list);
       }
     }
-    return items;
+    return { items, missingPages };
   }
 
   /**
@@ -169,17 +192,29 @@ export class DocumentController {
   private async fetchSource(source: SourceKey, query: string | undefined): Promise<Document[]> {
     const key = cacheKey(source, query);
     const cached = sourceCache.get(key);
-    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.documents;
+    if (cached) {
+      const ttl = cached.partial ? PARTIAL_CACHE_TTL_MS : CACHE_TTL_MS;
+      if (Date.now() - cached.fetchedAt < ttl) return cached.documents;
+    }
 
     const pending = inflight.get(key);
     if (pending) return pending;
 
     const promise = this.fetchSourceUncached(source, query)
-      .then(docs => {
-        sourceCache.set(key, { documents: docs, fetchedAt: Date.now() });
+      .then(({ documents, partial }) => {
+        // Never let an incomplete refresh shrink what we already serve.
+        const keepOld = partial && documents.length < (cached?.documents.length ?? 0);
+        const entry: SourceCacheEntry = keepOld
+          ? { ...cached!, fetchedAt: Date.now(), partial: true }
+          : { documents, fetchedAt: Date.now(), partial };
+
+        sourceCache.set(key, entry);
         evictOldestIfNeeded();
-        logger.info(`Cached source=${source} query="${query || ''}" → ${docs.length} docs`);
-        return docs;
+        logger.info(
+          `Cached source=${source} query="${query || ''}" → ${entry.documents.length} docs` +
+            `${entry.partial ? ' (partial)' : ''}${keepOld ? ' — kept previous, refresh was short' : ''}`,
+        );
+        return entry.documents;
       })
       .finally(() => {
         inflight.delete(key);
@@ -188,68 +223,61 @@ export class DocumentController {
     return promise;
   }
 
-  private async fetchSourceUncached(source: SourceKey, query: string | undefined): Promise<Document[]> {
-    const base = getApiBase('memories');
-    let docs: Document[] = [];
-    try {
+  /**
+   * Walk one upstream collection and map it to Documents. `collection` doubles
+   * as the URL segment and the key the items arrive under (`photos`, `texts`, …).
+   */
+  private async collect<T>(
+    collection: string,
+    query: string | undefined,
+    extra: Record<string, string> | undefined,
+    map: (items: T[]) => Document[],
+  ): Promise<{ documents: Document[]; missingPages: number }> {
+    const url = (page: number): string =>
+      `${getApiBase('memories')}/${MUNICIPALITY_ID}/${collection}` +
+      buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT, extra);
+
+    const { items, missingPages } = await this.fetchAllPages<T>(url, collection);
+    return { documents: map(items), missingPages };
+  }
+
+  private async fetchSourceUncached(
+    source: SourceKey,
+    query: string | undefined,
+  ): Promise<{ documents: Document[]; partial: boolean }> {
+    // `photo` and `object` are the same endpoint split by objectType.
+    const collect = (): Promise<{ documents: Document[]; missingPages: number }> => {
       switch (source) {
-        case 'film': {
-          const items = await this.fetchAllPages<Film>(
-            page => `${base}/${MUNICIPALITY_ID}/films${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
-            'films',
-          );
-          docs = mapFilmsToDocuments(items);
-          break;
-        }
-        case 'publication': {
-          const items = await this.fetchAllPages<Publication>(
-            page => `${base}/${MUNICIPALITY_ID}/publications${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
-            'publications',
-          );
-          docs = mapPublicationsToDocuments(items);
-          break;
-        }
-        case 'photo': {
-          const items = await this.fetchAllPages<Photo>(
-            page =>
-              `${base}/${MUNICIPALITY_ID}/photos${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT, { objectType: 'Foto' })}`,
-            'photos',
-          );
-          docs = mapPhotosToDocuments(items);
-          break;
-        }
-        case 'object': {
-          const items = await this.fetchAllPages<Photo>(
-            page =>
-              `${base}/${MUNICIPALITY_ID}/photos${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT, { objectType: 'Föremål' })}`,
-            'photos',
-          );
-          docs = mapPhotosToDocuments(items);
-          break;
-        }
-        case 'audio': {
-          const items = await this.fetchAllPages<Audio>(
-            page => `${base}/${MUNICIPALITY_ID}/audios${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
-            'audios',
-          );
-          docs = mapAudiosToDocuments(items);
-          break;
-        }
-        case 'text': {
-          const items = await this.fetchAllPages<Text>(
-            page => `${base}/${MUNICIPALITY_ID}/texts${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
-            'texts',
-          );
-          docs = mapTextsToDocuments(items);
-          break;
-        }
+        case 'film':
+          return this.collect<Film>('films', query, undefined, mapFilmsToDocuments);
+        case 'publication':
+          return this.collect<Publication>('publications', query, undefined, mapPublicationsToDocuments);
+        case 'photo':
+          return this.collect<Photo>('photos', query, { objectType: 'Foto' }, mapPhotosToDocuments);
+        case 'object':
+          return this.collect<Photo>('photos', query, { objectType: 'Föremål' }, mapPhotosToDocuments);
+        case 'audio':
+          return this.collect<Audio>('audios', query, undefined, mapAudiosToDocuments);
+        case 'text':
+          return this.collect<Text>('texts', query, undefined, mapTextsToDocuments);
       }
+    };
+
+    try {
+      const { documents, missingPages } = await collect();
+      if (missingPages > 0) {
+        logger.warn(
+          `Incomplete fetch for source=${source} query="${query || ''}": ${missingPages} page(s) unavailable — ` +
+            `serving ${documents.length} docs, retrying in ${PARTIAL_CACHE_TTL_MS / 60000} min`,
+        );
+      }
+      return { documents, partial: missingPages > 0 };
     } catch (e) {
+      // Only page 1 reaches here — later pages degrade to `missingPages` instead.
+      // Without page 1 there is nothing to serve, so mark partial to retry soon.
       logger.warn(`Failed to populate cache for source=${source} query=${query || ''}: ${(e as Error).message}`);
-      // Don't poison the cache with a partial result — return empty and retry next request.
-      return [];
+      return { documents: [], partial: true };
     }
-    return docs;
   }
 
   /**
