@@ -1,4 +1,11 @@
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosHeaders, AxiosResponseHeaders } from 'axios';
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosHeaders,
+  AxiosResponse,
+  AxiosResponseHeaders,
+} from 'axios';
 import { randomUUID } from 'crypto';
 import { apiURL } from '@/config/api-config';
 import { CLIENT_KEY } from '@/config';
@@ -91,6 +98,24 @@ export class ApiService {
     });
   }
 
+  private async send(config: AxiosRequestConfig, label: string): Promise<AxiosResponse> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.instance(config);
+      } catch (error: unknown) {
+        const response = axios.isAxiosError(error) ? error.response : undefined;
+        if (response?.status !== 429 || attempt >= MAX_THROTTLE_RETRIES) throw error;
+
+        const delay = throttleDelayMs(response.headers as AxiosResponseHeaders);
+        logger.warn(
+          `Throttled on ${label} — retrying in ${Math.round(delay / 1000)}s ` +
+            `(attempt ${attempt + 1}/${MAX_THROTTLE_RETRIES}): ${errorDetail(response.data)}`,
+        );
+        await sleep(delay);
+      }
+    }
+  }
+
   private async request<T>(config: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const preparedConfig: AxiosRequestConfig = {
       ...config,
@@ -99,37 +124,22 @@ export class ApiService {
       url: apiURL(config.url || ''),
     };
 
-    for (let attempt = 0; ; attempt++) {
-      try {
-        const res = await this.instance(preparedConfig);
-        return { data: res.data, message: 'success' };
-      } catch (error: unknown) {
-        if (!axios.isAxiosError(error)) {
-          throw new HttpException(500, 'Internal server error');
-        }
-
-        const axiosError = error as AxiosError;
-        const status = axiosError.response?.status ?? 500;
-        const detail = errorDetail(axiosError.response?.data);
-
-        // Quota exhausted — wait for the window to roll over and try again.
-        if (status === 429 && attempt < MAX_THROTTLE_RETRIES) {
-          const delay = throttleDelayMs(axiosError.response?.headers as AxiosResponseHeaders);
-          logger.warn(
-            `Throttled on ${config.method} ${config.url} — retrying in ${Math.round(delay / 1000)}s ` +
-              `(attempt ${attempt + 1}/${MAX_THROTTLE_RETRIES}): ${detail}`,
-          );
-          await sleep(delay);
-          continue;
-        }
-
-        logger.error(`API request failed: ${config.method} ${config.url} => ${status}: ${detail}`);
-
-        if (status === 404) {
-          throw new HttpException(404, 'Not found');
-        }
-        throw new HttpException(status, detail);
+    try {
+      const res = await this.send(preparedConfig, `${config.method} ${config.url}`);
+      return { data: res.data, message: 'success' };
+    } catch (error: unknown) {
+      if (!axios.isAxiosError(error)) {
+        throw new HttpException(500, 'Internal server error');
       }
+
+      const status = (error as AxiosError).response?.status ?? 500;
+      const detail = errorDetail((error as AxiosError).response?.data);
+      logger.error(`API request failed: ${config.method} ${config.url} => ${status}: ${detail}`);
+
+      if (status === 404) {
+        throw new HttpException(404, 'Not found');
+      }
+      throw new HttpException(status, detail);
     }
   }
 
@@ -150,7 +160,7 @@ export class ApiService {
       url: apiURL(config.url || ''),
     };
     try {
-      return await this.instance(preparedConfig);
+      return await this.send(preparedConfig, `GET ${config.url}`);
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status ?? 500;
