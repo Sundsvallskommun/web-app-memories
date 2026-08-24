@@ -23,7 +23,10 @@ envalid.cleanEnv(process.env, {
 module.exports = withBundleAnalyzer({
   output: 'standalone',
   images: {
-    domains: [process.env.DOMAIN_NAME].filter(Boolean),
+    remotePatterns: [process.env.DOMAIN_NAME].filter(Boolean).flatMap((hostname) => [
+      { protocol: 'https', hostname },
+      { protocol: 'http', hostname },
+    ]),
     formats: ['image/avif', 'image/webp'],
   },
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
