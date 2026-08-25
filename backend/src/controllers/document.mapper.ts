@@ -446,3 +446,94 @@ export interface PagedTextResponse {
   texts: Text[];
   _meta: PagingMetaData;
 }
+
+// ============================================================================
+//  Combined object search (/objects)
+// ============================================================================
+//
+// `/objects` searches every object type and register in one call and returns a
+// deliberately lean projection: enough to render a result row, and nothing
+// more. Media, descriptions and per-type metadata only exist on the detail
+// endpoints, which `/documents/:id` still uses.
+
+export interface CombinedObjectCreator {
+  personId?: number | null;
+  person?: string | null;
+  legalEntityId?: number | null;
+  legalEntity?: string | null;
+}
+
+export interface CombinedObject {
+  /** Stable key across types, shaped `{type}-{id}` (e.g. `foto-2275`). */
+  objectKey: string;
+  sourceId: number;
+  /** Foto | Föremål | Film | Ljud | Text | Publikation | Person | Juridisk person | Sjöman */
+  objectType: string;
+  title: string | null;
+  /** Derived from the record's date; the birth year for Person and Sjöman. */
+  year: number | null;
+  topographyId: number | null;
+  /** Free-text location; the birth parish for Person and Sjöman. */
+  locationText: string | null;
+  /** Resolved place name from TOPOGRAFI, preferred over locationText. */
+  location: string | null;
+  creator?: CombinedObjectCreator | null;
+}
+
+export interface CombinedObjectResponse {
+  objects: CombinedObject[];
+  /** Match count per objectType, independent of the current page. */
+  typeCounts: Record<string, number>;
+  _meta: PagingMetaData;
+}
+
+/**
+ * Upstream `objectType` to the `type` the frontend already understands.
+ * Foto and Föremål are the same upstream collection split by objectType, which
+ * is why they share the `foto-` key prefix but map to different types here.
+ */
+const OBJECT_TYPE_TO_DOCUMENT_TYPE: Record<string, string> = {
+  Foto: 'Photo',
+  Föremål: 'Object',
+  Film: 'Film',
+  Ljud: 'Audio',
+  Text: 'Text',
+  Publikation: 'Publication',
+  Person: 'Person',
+  'Juridisk person': 'LegalEntity',
+  Sjöman: 'Seaman',
+};
+
+/** The six types that carry documents. The registers are searchable but are not documents. */
+export const DOCUMENT_OBJECT_TYPES = ['Foto', 'Föremål', 'Film', 'Ljud', 'Text', 'Publikation'];
+
+/**
+ * `/objects` and `/documents/:id` disagree on two prefixes: upstream says
+ * `foto-` and `ljud-` where this API has always said `photo-` and `audio-`.
+ * Normalise here so ids stay stable for existing links, bookmarks and the
+ * `relatedIds` the detail endpoint emits.
+ */
+export const normalizeObjectKey = (objectKey: string): string => {
+  if (objectKey.startsWith('foto-')) return `photo-${objectKey.slice('foto-'.length)}`;
+  if (objectKey.startsWith('ljud-')) return `audio-${objectKey.slice('ljud-'.length)}`;
+  return objectKey;
+};
+
+const creatorName = (creator: CombinedObjectCreator | null | undefined): string =>
+  creator?.person || creator?.legalEntity || '';
+
+export const mapCombinedObjectToDocument = (obj: CombinedObject): Document => ({
+  id: normalizeObjectKey(obj.objectKey),
+  title: obj.title || '',
+  type: OBJECT_TYPE_TO_DOCUMENT_TYPE[obj.objectType] || obj.objectType,
+  year: obj.year ?? 0,
+  ort: opt(obj.locationText),
+  plats: opt(obj.location),
+  location: pickLocation(obj.location, obj.locationText),
+  creator: creatorName(obj.creator),
+  // Not part of the search projection. The detail endpoint carries both.
+  description: '',
+});
+
+export const mapCombinedObjectsToDocuments = (objects: CombinedObject[]): Document[] =>
+  objects.map(mapCombinedObjectToDocument);
