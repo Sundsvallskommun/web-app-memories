@@ -1,11 +1,44 @@
 @layer utilities {
-    .MuiSvgIcon-root.material-icon {
-        user-select: none;
-        font-size: 1.25em;
-        width: 1em;
-        height: 1em;
-        display: inline-block;
-        fill: currentColor;
-        flex-shrink: 0;
+  .MuiSvgIcon-root.material-icon {
+    user-select: none;
+    font-size: 1.25em;
+    width: 1em;
+    height: 1em;
+    display: inline-block;
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@layer utilities {
+  .animate-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .animate-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.55) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    animation: skeleton-shimmer 2s infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-shimmer::after {
+      animation: none;
     }
+  }
 }
