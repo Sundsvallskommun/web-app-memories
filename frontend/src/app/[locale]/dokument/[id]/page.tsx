@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import DefaultLayout from '@layouts/default-layout/default-layout.component';
 import Main from '@layouts/main/main.component';
 import { Button, Chip, Table } from '@sk-web-gui/react';
-import { ArrowLeft, Download, FileText, Image, Music, Video, Package } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Image as ImageIcon, Music, Video, Package } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, Document, DocumentType } from '@data-contracts/document';
 import { getDocumentById } from '@services/document-service';
 import { DocumentPreview } from '@components/document-preview/document-preview.component';
@@ -16,9 +16,9 @@ import { DocumentMeta } from '@components/document-meta/document-meta.component'
 const typeIcons: Record<string, React.ReactNode> = {
   Text: <FileText size={20} />,
   Publication: <FileText size={20} />,
-  Photo: <Image size={20} />,
-  Karta: <Image size={20} />,
-  Ritning: <Image size={20} />,
+  Photo: <ImageIcon size={20} />,
+  Karta: <ImageIcon size={20} />,
+  Ritning: <ImageIcon size={20} />,
   Ljud: <Music size={20} />,
   Audio: <Music size={20} />,
   Film: <Video size={20} />,
