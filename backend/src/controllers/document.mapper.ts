@@ -480,10 +480,14 @@ export interface CombinedObject {
   creator?: CombinedObjectCreator | null;
 }
 
+export interface TypeCount {
+  objectType: string;
+  count: number;
+}
+
 export interface CombinedObjectResponse {
   objects: CombinedObject[];
-  /** Match count per objectType, independent of the current page. */
-  typeCounts: Record<string, number>;
+  typeCounts: TypeCount[];
   _meta: PagingMetaData;
 }
 

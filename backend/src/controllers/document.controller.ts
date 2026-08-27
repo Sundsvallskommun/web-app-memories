@@ -12,6 +12,7 @@ import {
   Photo,
   Publication,
   Text,
+  TypeCount,
   mapAudioToDocument,
   mapCombinedObjectsToDocuments,
   mapFilmToDocument,
@@ -32,13 +33,19 @@ import {
 // ~36 upstream requests per distinct query against a per-minute quota, and it
 // could only produce accurate totals by fetching everything first.
 
-/** Upstream sort fields. The frontend's own names are mapped onto these. */
-const SORTABLE = ['objectKey', 'title', 'year', 'objectType'];
-const DEFAULT_SORT = 'year';
+/** Upstream sort fields. Anything else is dropped rather than substituted. */
+const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType']);
 
-const toUpstreamSort = (sortBy: string | undefined): string => {
-  if (!sortBy) return DEFAULT_SORT;
-  return SORTABLE.includes(sortBy) ? sortBy : DEFAULT_SORT;
+const toUpstreamSort = (sortBy: string | undefined): string | undefined =>
+  sortBy && SORTABLE.has(sortBy) ? sortBy : undefined;
+
+/**
+ * Relevance is scored with the best match lowest, so ascending is best first.
+ * Sending DESC alongside it returns the worst matches first.
+ */
+const toUpstreamDirection = (sortBy: string, sortDirection: string | undefined): string => {
+  if (sortBy === 'relevance') return 'ASC';
+  return sortDirection?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 };
 
 /**
@@ -52,10 +59,13 @@ const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
   Audio: 'Ljud',
   Text: 'Text',
   Publication: 'Publikation',
+  Person: 'Person',
+  Seaman: 'Sjöman',
+  LegalEntity: 'Juridisk person',
 };
 
-const countFor = (typeCounts: Record<string, number> | undefined, objectType: string): number =>
-  typeCounts?.[objectType] ?? 0;
+const countFor = (typeCounts: TypeCount[] | undefined, objectType: string): number =>
+  typeCounts?.find(c => c.objectType === objectType)?.count ?? 0;
 
 // ============================================================================
 
@@ -89,8 +99,11 @@ export class DocumentController {
     const params = new URLSearchParams();
     params.set('page', String(safePage));
     params.set('limit', String(safePageSize));
-    params.set('sortBy', toUpstreamSort(sortBy));
-    params.set('sortDirection', (sortDirection || 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC');
+    const upstreamSort = toUpstreamSort(sortBy);
+    if (upstreamSort) {
+      params.set('sortBy', upstreamSort);
+      params.set('sortDirection', toUpstreamDirection(upstreamSort, sortDirection));
+    }
 
     const trimmedQuery = query?.trim();
     if (trimmedQuery) params.set('query', trimmedQuery);
@@ -100,13 +113,8 @@ export class DocumentController {
     if (creator?.trim()) params.set('creator', creator.trim());
 
     // Restrict to the requested type, or to the document types when none is
-    // given, so the person and legal-entity registers do not appear among
-    // document results.
-    //
-    // NOTE: /objects does not accept objectType yet (HYDRAN-2785 depends on it).
-    // Until it does, the parameter is ignored upstream and results are not
-    // narrowed. Sending it now means type filtering starts working on deploy
-    // with no change here.
+    // given. Registers hold about 174k of the 205k records, so without this a
+    // plain search would return mostly persons and seamen.
     const requestedObjectType = type ? DOCUMENT_TYPE_TO_OBJECT_TYPE[type] : undefined;
     for (const objectType of requestedObjectType ? [requestedObjectType] : DOCUMENT_OBJECT_TYPES) {
       params.append('objectType', objectType);
