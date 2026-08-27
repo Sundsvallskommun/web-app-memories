@@ -277,13 +277,17 @@ const SearchPage: React.FC = () => {
 
               <div className="flex items-center gap-sm flex-wrap">
                 <div className="flex items-center gap-sm">
-                  <label className="text-label-medium text-dark-secondary inline-flex items-center gap-xs">
+                  <label
+                    htmlFor="page-size"
+                    className="text-label-medium text-dark-secondary inline-flex items-center gap-xs"
+                  >
                     Per sida
                   </label>
                   <Select
                     size="sm"
                     value={String(pageSize)}
                     onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    id="page-size"
                     data-cy="page-size-select"
                   >
                     {PAGE_SIZE_OPTIONS.map((n) => (
@@ -304,6 +308,7 @@ const SearchPage: React.FC = () => {
                         data-cy="sort-filter"
                         className="[&_.sk-form-checkbox]:order-last [&_.sk-form-checkbox]:!mr-8"
                       >
+                        <Filter.Label className="sr-only">Sortera efter</Filter.Label>
                         {SORT_OPTIONS.map((o) => (
                           <Filter.Item
                             key={o.value}
