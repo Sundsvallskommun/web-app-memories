@@ -276,8 +276,10 @@ const SearchPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-sm flex-wrap">
-                <label className="text-label-small text-dark-secondary inline-flex items-center gap-xs">
-                  Per sida
+                <div className="flex items-center gap-sm">
+                  <label className="text-label-medium text-dark-secondary inline-flex items-center gap-xs">
+                    Per sida
+                  </label>
                   <Select
                     size="sm"
                     value={String(pageSize)}
@@ -290,19 +292,18 @@ const SearchPage: React.FC = () => {
                       </Select.Option>
                     ))}
                   </Select>
-                </label>
+                </div>
 
                 <div className="relative">
                   <PopupMenu>
-                    <PopupMenu.Button variant="ghost" size="sm" rightIcon={<ChevronDown size={16} />}>
+                    <PopupMenu.Button variant="ghost" size="md" rightIcon={<ChevronDown size={16} />}>
                       Sortering
                     </PopupMenu.Button>
-                    <PopupMenu.Panel>
+                    <PopupMenu.Panel className="w-[260px]">
                       <Filter
                         data-cy="sort-filter"
                         className="[&_.sk-form-checkbox]:order-last [&_.sk-form-checkbox]:!mr-8"
                       >
-                        <Filter.Label>Sortera efter</Filter.Label>
                         {SORT_OPTIONS.map((o) => (
                           <Filter.Item
                             key={o.value}
