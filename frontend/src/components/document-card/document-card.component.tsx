@@ -16,7 +16,7 @@ const PLACEHOLDER_ICONS: Record<string, React.ReactNode> = {
   Person: <User size={32} />,
 };
 
-const TYPES_WITH_THUMBNAILS = ['Photo', 'Object', 'Publication', 'Text'];
+const TYPES_WITH_THUMBNAILS = new Set(['Photo', 'Object', 'Publication', 'Text']);
 
 interface DocumentCardProps {
   doc: Document;
@@ -25,7 +25,7 @@ interface DocumentCardProps {
 export const DocumentCard: React.FC<DocumentCardProps> = ({ doc }) => {
   const [imageFailed, setImageFailed] = useState(false);
 
-  const showImage = TYPES_WITH_THUMBNAILS.includes(doc.type) && !imageFailed;
+  const showImage = TYPES_WITH_THUMBNAILS.has(doc.type) && !imageFailed;
 
   return (
     <Card

@@ -348,7 +348,7 @@ const SearchPage: React.FC = () => {
               />
             )}
 
-            {!loading && !failed && result && result.documents.length > 0 && (
+            {!loading && !failed && !!result?.documents?.length && (
               <ul className={GRID_CLASS} data-cy="document-grid">
                 {result.documents.map((doc) => (
                   <li key={doc.id} className={GRID_ITEM_CLASS}>
@@ -358,7 +358,7 @@ const SearchPage: React.FC = () => {
               </ul>
             )}
 
-            {!loading && !failed && result && result.documents.length === 0 && (
+            {!loading && !failed && result?.documents?.length === 0 && (
               <div className="text-center py-xl">
                 <p className="text-dark-secondary">Inga träffar hittades. Prova att ändra dina sökkriterier.</p>
               </div>
