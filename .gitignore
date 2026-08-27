@@ -17,3 +17,5 @@ next-env.d.ts
 # Claude AI
 .claude/
 CLAUDE.md
+
+tsconfig.tsbuildinfo
