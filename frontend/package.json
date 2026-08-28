@@ -32,7 +32,7 @@
     "@headlessui/react": "^2.2.0",
     "@next/bundle-analyzer": "^16.3.2",
     "@sk-web-gui/core": "^4.5.0",
-    "@sk-web-gui/react": "^3.0.12",
+    "@sk-web-gui/react": "^3.1.2",
     "@tailwindcss/forms": "^0.5.10",
     "axios": "^1.8.4",
     "dayjs": "^1.11.13",

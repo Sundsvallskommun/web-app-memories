@@ -4,12 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import DefaultLayout from '@layouts/default-layout/default-layout.component';
 import Main from '@layouts/main/main.component';
-import { SearchField, Button, Pagination, Select, Chip, PopupMenu, Filter } from '@sk-web-gui/react';
+import { Alert, SearchField, Button, Pagination, Select, Chip, PopupMenu, Filter } from '@sk-web-gui/react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, DocumentType, SearchParams, SearchResult } from '@data-contracts/document';
 import { DocumentCard } from '@components/document-card/document-card.component';
 import { DocumentCardSkeleton } from '@components/document-card/document-card-skeleton.component';
-import { CustomAlert } from '@components/custom-alert/custom-alert.component';
 import { searchDocuments } from '@services/document-service';
 
 const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
@@ -338,14 +337,29 @@ const SearchPage: React.FC = () => {
             )}
 
             {!loading && failed && (
-              <CustomAlert
-                title="Sökningen kunde inte genomföras"
-                description="Det gick inte att hämta träffar just nu."
-                buttonLabel="Försök igen"
-                onButtonClick={() => setRetryToken((t) => t + 1)}
-                onClose={() => setFailed(false)}
-                data-cy="search-error"
-              />
+              <div role="alert" data-cy="search-error">
+                <Alert type="warning">
+                  <Alert.Icon />
+                  <Alert.Content>
+                    <Alert.Content.Title>Sökningen kunde inte genomföras</Alert.Content.Title>
+                    <Alert.Content.Description>Det gick inte att hämta träffar just nu.</Alert.Content.Description>
+
+                    <Button variant="link" size="sm" className="mt-xs" onClick={() => setRetryToken((t) => t + 1)}>
+                      Försök igen
+                    </Button>
+                  </Alert.Content>
+
+                  <Button
+                    iconButton
+                    variant="tertiary"
+                    size="sm"
+                    aria-label="Stäng meddelandet"
+                    onClick={() => setFailed(false)}
+                  >
+                    <X size={20} />
+                  </Button>
+                </Alert>
+              </div>
             )}
 
             {!loading && !failed && !!result?.documents?.length && (
