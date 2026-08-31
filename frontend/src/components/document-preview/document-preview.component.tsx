@@ -17,7 +17,7 @@ import { apiURL } from '@utils/api-url';
 // MIME on the Document model. Browsers render application/pdf inline
 // natively when the API sets Content-Disposition: inline.
 
-type Variant = 'large' | 'thumbnail';
+export type Variant = 'large' | 'thumbnail';
 
 const fileUrl = (docId: string, variant: string): string => apiURL(`documents/${docId}/file?variant=${variant}`);
 
@@ -27,8 +27,7 @@ const isImageType = (type: string): boolean =>
 const findFile = (doc: Document, variant: string): DocumentFile | undefined =>
   (doc.files ?? []).find((f) => f.variant === variant);
 
-const isPdfFilename = (filename: string | undefined): boolean =>
-  !!filename && filename.toLowerCase().endsWith('.pdf');
+const isPdfFilename = (filename: string | undefined): boolean => !!filename && filename.toLowerCase().endsWith('.pdf');
 
 const imageVariants = (doc: Document): Variant[] => {
   const out: Variant[] = [];
@@ -38,19 +37,20 @@ const imageVariants = (doc: Document): Variant[] => {
   return out;
 };
 
-const VARIANT_LABELS: Record<Variant, string> = {
+export const VARIANT_LABELS: Record<Variant, string> = {
   large: 'Stor',
   thumbnail: 'Liten',
 };
 
 interface Props {
   doc: Document;
+  onVariantChange?: (variant: Variant | undefined) => void;
 }
 
-export const DocumentPreview: React.FC<Props> = ({ doc }) => {
+export const DocumentPreview: React.FC<Props> = ({ doc, onVariantChange }) => {
   if (doc.type === 'Audio') {
     return (
-      <div className="bg-background-200 rounded-cards p-md flex justify-center" data-cy="document-preview-audio">
+      <div className="w-full flex justify-center" data-cy="document-preview-audio">
         <audio controls preload="metadata" src={apiURL(`documents/${doc.id}/stream`)} className="w-full max-w-2xl">
           Din webbläsare stödjer inte ljuduppspelning.
         </audio>
@@ -64,7 +64,10 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
   const textFile = doc.type === 'Publication' || doc.type === 'Text' ? findFile(doc, 'text') : undefined;
   const largeIsPdf = isPdfFilename(largeFile?.filename);
   const textIsPdf = isPdfFilename(textFile?.filename);
-  const pdfVariant: Variant | 'text' | undefined = largeIsPdf ? 'large' : textIsPdf ? 'text' : undefined;
+  const pdfVariant: Variant | 'text' | undefined =
+    largeIsPdf ? 'large'
+    : textIsPdf ? 'text'
+    : undefined;
   const showImage = !largeIsPdf && imageVariants(doc).length > 0;
   // HtmlPreview is only for transformed text/XML; if the text variant is a PDF
   // we show it via PdfPreview instead (sandbox on HtmlPreview blocks the
@@ -76,14 +79,14 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
   return (
     <div className="flex flex-col gap-md" data-cy="document-preview">
       {pdfVariant && <PdfPreview docId={doc.id} title={doc.title} variant={pdfVariant} />}
-      {showImage && <ImagePreview doc={doc} />}
+      {showImage && <ImagePreview doc={doc} onVariantChange={onVariantChange} />}
       {showText && <HtmlPreview docId={doc.id} title={doc.title} />}
     </div>
   );
 };
 
 const PdfPreview: React.FC<{ docId: string; title: string; variant: string }> = ({ docId, title, variant }) => (
-  <div className="bg-background-200 rounded-cards p-md" data-cy="preview-pdf">
+  <div className="w-full" data-cy="preview-pdf">
     <iframe
       src={fileUrl(docId, variant)}
       title={title || 'PDF-förhandsvisning'}
@@ -93,7 +96,7 @@ const PdfPreview: React.FC<{ docId: string; title: string; variant: string }> = 
 );
 
 const HtmlPreview: React.FC<{ docId: string; title: string }> = ({ docId, title }) => (
-  <div className="bg-background-200 rounded-cards p-md" data-cy="preview-text">
+  <div className="w-full" data-cy="preview-text">
     <iframe
       src={fileUrl(docId, 'text')}
       title={title ? `${title} (text)` : 'Textförhandsvisning'}
@@ -103,7 +106,10 @@ const HtmlPreview: React.FC<{ docId: string; title: string }> = ({ docId, title 
   </div>
 );
 
-const ImagePreview: React.FC<{ doc: Document }> = ({ doc }) => {
+const ImagePreview: React.FC<{ doc: Document; onVariantChange?: (variant: Variant | undefined) => void }> = ({
+  doc,
+  onVariantChange,
+}) => {
   const variants = useMemo(() => imageVariants(doc), [doc]);
   const [selected, setSelected] = useState<Variant | undefined>(variants[0]);
   const [failed, setFailed] = useState(false);
@@ -114,21 +120,22 @@ const ImagePreview: React.FC<{ doc: Document }> = ({ doc }) => {
     setFailed(false);
   }, [doc.id, variants]);
 
+  useEffect(() => {
+    onVariantChange?.(selected);
+  }, [selected, onVariantChange]);
+
   if (!selected) return null;
 
   if (failed) {
     return (
-      <div
-        className="bg-background-200 rounded-cards p-lg text-center text-dark-secondary"
-        data-cy="preview-missing"
-      >
+      <div className="bg-background-200 rounded-cards p-lg text-center text-dark-secondary" data-cy="preview-missing">
         Förhandsvisning saknas — filen kunde inte hämtas från arkivet.
       </div>
     );
   }
 
   return (
-    <div className="bg-background-200 rounded-cards p-md flex flex-col items-center gap-sm">
+    <div className="flex flex-col items-center gap-8">
       <img
         src={fileUrl(doc.id, selected)}
         alt={doc.title || 'Förhandsvisning'}
@@ -154,7 +161,7 @@ const ImagePreview: React.FC<{ doc: Document }> = ({ doc }) => {
                 key={v}
                 size="sm"
                 variant={isActive ? 'primary' : 'tertiary'}
-                color="vattjom"
+                color="primary"
                 onClick={() => {
                   setFailed(false); // retry with the new variant if a load previously failed
                   setSelected(v);

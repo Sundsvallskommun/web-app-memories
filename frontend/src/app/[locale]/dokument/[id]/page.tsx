@@ -4,32 +4,35 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DefaultLayout from '@layouts/default-layout/default-layout.component';
 import Main from '@layouts/main/main.component';
-import { Button, Chip, Table } from '@sk-web-gui/react';
-import { ArrowLeft, Download, FileText, Image as ImageIcon, Music, Video, Package } from 'lucide-react';
+import { Alert, Breadcrumb, Button } from '@sk-web-gui/react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, Document, DocumentType } from '@data-contracts/document';
 import { getDocumentById } from '@services/document-service';
-import { DocumentPreview } from '@components/document-preview/document-preview.component';
+import { DocumentPreview, VARIANT_LABELS, Variant } from '@components/document-preview/document-preview.component';
 import { DocumentGallery } from '@components/document-gallery/document-gallery.component';
 import { DocumentRelated } from '@components/document-related/document-related.component';
-import { DocumentMeta } from '@components/document-meta/document-meta.component';
+import { DownloadError, downloadDocumentFile } from '@utils/download-file';
 
-const typeIcons: Record<string, React.ReactNode> = {
-  Text: <FileText size={20} />,
-  Publication: <FileText size={20} />,
-  Photo: <ImageIcon size={20} />,
-  Karta: <ImageIcon size={20} />,
-  Ritning: <ImageIcon size={20} />,
-  Ljud: <Music size={20} />,
-  Audio: <Music size={20} />,
-  Film: <Video size={20} />,
-  Object: <Package size={20} />,
-};
+// Fields the design asks for that the API does not carry: Samling
+// (archiveCollection is declared upstream but never populated), Skapad and
+// Uppdaterat (no upstream column at all). They are left out rather than
+// rendered as permanently empty rows. Add them here when the API grows them.
+const metaRows = (doc: Document): { label: string; value: string }[] =>
+  [
+    { label: 'Objekt typ', value: DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type },
+    { label: 'Upphovsman', value: doc.creator },
+    { label: 'Plats', value: doc.location },
+    { label: 'Tidpunkt', value: doc.year ? String(doc.year) : '' },
+  ].filter((row) => !!row.value);
 
 const DocumentDetailPage: React.FC = () => {
   const params = useParams();
   const router = useRouter();
   const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [previewVariant, setPreviewVariant] = useState<Variant | undefined>(undefined);
 
   useEffect(() => {
     const id = params.id as string;
@@ -41,53 +44,32 @@ const DocumentDetailPage: React.FC = () => {
     }
   }, [params.id]);
 
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<string | null>(null);
+  const handleDownload = async () => {
+    if (!doc) return;
+    const file =
+      doc.files?.find((f) => f.variant === previewVariant) ??
+      doc.files?.find((f) => f.variant === 'large') ??
+      doc.files?.[0];
+    const filename = file?.filename ?? `${doc.id}.jpg`;
 
-  const handleDownload = async (filename: string, variant?: string) => {
-    const id = params.id as string;
-    const base = process.env.NEXT_PUBLIC_API_URL || '/api';
-    const url = variant
-      ? `${base}/documents/${id}/file?variant=${variant}`
-      : `${base}/documents/${id}/file`;
-
-    // Fetch first so we can detect 404 (file missing on samba) and show a friendly
-    // message instead of letting the browser render its raw error page.
     setDownloadError(null);
-    setDownloading(filename);
+    setDownloading(true);
     try {
-      const res = await fetch(url);
-      if (!res.ok) {
-        if (res.status === 404) {
-          setDownloadError(`Filen "${filename}" saknas i arkivet. Det här är en känd lucka i digitaliseringen — kontakta arkivet om du behöver originalet.`);
-        } else {
-          setDownloadError(`Kunde inte hämta "${filename}" (felkod ${res.status}).`);
-        }
-        return;
-      }
-      // Stream the blob to a temporary object URL the browser will download.
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      await downloadDocumentFile(doc.id, filename, file?.variant);
     } catch (e) {
-      setDownloadError(`Nedladdningen misslyckades: ${e instanceof Error ? e.message : 'okänt fel'}.`);
+      setDownloadError(e instanceof DownloadError ? e.message : 'Nedladdningen misslyckades.');
     } finally {
-      setDownloading(null);
+      setDownloading(false);
     }
   };
 
   if (loading) {
     return (
-      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
+      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
         <Main>
-          <div className="flex justify-center py-xl">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+          <div className="bg-background-200 rounded-cards p-24 flex flex-col items-center gap-16">
+            <div className="w-full max-w-2xl aspect-[4/3] bg-[#0000001f] animate-shimmer rounded-8" />
+            <div className="h-16 w-64 bg-[#0000001f] animate-shimmer rounded-8" />
           </div>
         </Main>
       </DefaultLayout>
@@ -96,10 +78,10 @@ const DocumentDetailPage: React.FC = () => {
 
   if (!doc) {
     return (
-      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
+      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
         <Main>
-          <div className="flex flex-col items-center gap-md py-xl">
-            <p className="text-body">Dokumentet hittades inte.</p>
+          <div className="flex flex-col items-center gap-16 py-32">
+            <p>Dokumentet hittades inte.</p>
             <Button variant="tertiary" leftIcon={<ArrowLeft size={16} />} onClick={() => router.push('/')}>
               Tillbaka till sökningen
             </Button>
@@ -109,88 +91,64 @@ const DocumentDetailPage: React.FC = () => {
     );
   }
 
+  const title = doc.title || '(Utan titel)';
+
   return (
-    <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
+    <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
       <Main>
-        <div className="flex flex-col gap-lg">
-          {/* Back button */}
-          <div>
-            <Button variant="tertiary" leftIcon={<ArrowLeft size={16} />} onClick={() => router.back()}>
-              Tillbaka till sökningen
-            </Button>
-          </div>
+        <div className="flex flex-col gap-24">
+          <Breadcrumb>
+            <Breadcrumb.Item>
+              <Breadcrumb.Link href="/">Sökning</Breadcrumb.Link>
+            </Breadcrumb.Item>
+            <Breadcrumb.Item currentPage>
+              <Breadcrumb.Link>{title}</Breadcrumb.Link>
+            </Breadcrumb.Item>
+          </Breadcrumb>
+          <h1 className="sr-only">{title}</h1>
+          <div className="bg-background-200 rounded-cards px-72 py-40 flex flex-col gap-32">
+            <div className="flex flex-col items-center gap-16">
+              <DocumentPreview doc={doc} onVariantChange={setPreviewVariant} />
 
-          {/* Title + type */}
-          <div className="flex flex-col gap-sm">
-            <div className="flex items-center gap-sm">
-              <span className="text-dark-secondary">{typeIcons[doc.type]}</span>
-              <Chip strong>{DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type}</Chip>
-            </div>
-            <h1 className="text-h2-sm md:text-h2-md">{doc.title || '(Utan titel)'}</h1>
-          </div>
+              {doc.description && <p className="text-center font-bold">{doc.description}</p>}
 
-          {/* Inline preview (image / video) — placed first so the asset is the
-              user's primary anchor on the page. Component handles its own 404
-              fallback so a missing samba file doesn't break layout. */}
-          <DocumentPreview doc={doc} />
+              <Button
+                color="primary"
+                rightIcon={<Download size={16} />}
+                onClick={handleDownload}
+                loading={downloading}
+                data-cy="document-download"
+              >
+                {previewVariant ? `Ladda ned (${VARIANT_LABELS[previewVariant]})` : 'Ladda ned'}
+              </Button>
 
-          {/* Gallery of extra media files (Text / TEXT_MULTI). Renders nothing
-              for documents without attached media. */}
-          <DocumentGallery doc={doc} />
-
-          {/* Metadata in legacy field order (matches sok.sundsvallsminnen.se). */}
-          <div className="bg-background-200 rounded-cards p-lg">
-            <h2 className="text-label-medium mb-md">Uppgifter</h2>
-            <DocumentMeta doc={doc} />
-          </div>
-
-          {/* Files / Downloads */}
-          {doc.files && doc.files.length > 0 && (
-            <div className="bg-background-200 rounded-cards p-lg">
-              <h2 className="text-label-medium mb-md">Filer</h2>
               {downloadError && (
-                <div
-                  role="alert"
-                  className="mb-md p-sm rounded-cards bg-error-surface text-error-text border border-error"
-                >
-                  {downloadError}
+                <div role="alert" className="w-full max-w-2xl">
+                  <Alert type="warning">
+                    <Alert.Icon />
+                    <Alert.Content>
+                      <Alert.Content.Description>{downloadError}</Alert.Content.Description>
+                    </Alert.Content>
+                  </Alert>
                 </div>
               )}
-              <Table>
-                <Table.Header>
-                  <Table.HeaderColumn>Filnamn</Table.HeaderColumn>
-                  <Table.HeaderColumn>Format</Table.HeaderColumn>
-                  <Table.HeaderColumn>Storlek</Table.HeaderColumn>
-                  <Table.HeaderColumn></Table.HeaderColumn>
-                </Table.Header>
-                <Table.Body>
-                  {doc.files.map((file, i) => (
-                    <Table.Row key={i}>
-                      <Table.Column>{file.filename}</Table.Column>
-                      <Table.Column>{file.format}</Table.Column>
-                      <Table.Column>{file.size}</Table.Column>
-                      <Table.Column>
-                        <Button
-                          size="sm"
-                          color="vattjom"
-                          leftIcon={<Download size={14} />}
-                          onClick={() => handleDownload(file.filename, file.variant)}
-                          loading={downloading === file.filename}
-                          disabled={downloading !== null}
-                        >
-                          Ladda ner
-                        </Button>
-                      </Table.Column>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table>
             </div>
-          )}
 
-          {/* Related photos (FOTO_FOTO) — navigates to each linked record.
-              Renders nothing for documents without related ids. */}
-          <DocumentRelated doc={doc} />
+            <dl className="flex flex-col gap-4" data-cy="document-meta">
+              {metaRows(doc).map((row) => (
+                <div key={row.label} className="flex gap-8">
+                  <dt className="font-bold">{row.label}:</dt>
+                  <dd>{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            {/* Extra media files (Text / TEXT_MULTI). Renders nothing for
+                documents without attached media. */}
+            <DocumentGallery doc={doc} />
+
+            <DocumentRelated doc={doc} />
+          </div>
         </div>
       </Main>
     </DefaultLayout>
