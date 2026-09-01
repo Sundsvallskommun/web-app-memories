@@ -4,136 +4,70 @@ import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
 import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
-import { logger } from '@utils/logger';
 import {
   Audio,
-  Document,
+  CombinedObjectResponse,
+  DOCUMENT_OBJECT_TYPES,
   Film,
   Photo,
   Publication,
   Text,
+  TypeCount,
   mapAudioToDocument,
-  mapAudiosToDocuments,
+  mapCombinedObjectsToDocuments,
   mapFilmToDocument,
-  mapFilmsToDocuments,
   mapPhotoToDocument,
-  mapPhotosToDocuments,
   mapPublicationToDocument,
-  mapPublicationsToDocuments,
   mapTextToDocument,
-  mapTextsToDocuments,
 } from './document.mapper';
 
 // ============================================================================
-//  Server-side document cache
+//  Unified search
 // ============================================================================
 //
-// The previous "fan out per page" approach can't deliver consistent pagination
-// because each upstream source paginates independently — global page N pulls
-// from each source's page N, which doesn't correspond to a single global slice.
-// At high page numbers most sources are exhausted and the page renders sparse
-// or empty (the "ghost pages" issue).
+// Search is one upstream call to /objects, which spans every object type and
+// register, sorts and paginates globally, and returns per-type match counts.
 //
-// Instead: fetch ALL records from each source ONCE, map them to Documents,
-// cache by (source, query). All paging then slices from the cached list:
-//   - per-page count is exactly `pageSize` (or less only on the very last page)
-//   - `totalPages` is accurate
-//   - filtering by type just slices a different cache key
-//   - sort happens in memory, so cross-source sort is truly global
-//
-// Memory budget: ~28k records × ~1KB ≈ 30MB per query for the full unfiltered
-// set. Cap at MAX_CACHE_KEYS entries with LRU eviction so worst-case memory
-// stays bounded regardless of distinct queries.
+// This replaces a six-way fan-out that page-walked each collection separately
+// and held the whole corpus in memory to sort and slice it. That approach cost
+// ~36 upstream requests per distinct query against a per-minute quota, and it
+// could only produce accurate totals by fetching everything first.
 
-type SourceKey = 'film' | 'publication' | 'photo' | 'object' | 'audio' | 'text';
+/** Upstream sort fields. Anything else is dropped rather than substituted. */
+const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType']);
 
-interface SourceCacheEntry {
-  documents: Document[];
-  fetchedAt: number;
-  /** True when some upstream pages were lost (throttling) and the set is incomplete. */
-  partial: boolean;
-}
+const toUpstreamSort = (sortBy: string | undefined): string | undefined =>
+  sortBy && SORTABLE.has(sortBy) ? sortBy : undefined;
 
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes — archive doesn't change often
-// A partial set is still worth serving — stale-but-something beats an empty grid —
-// but it should be refreshed far sooner than a complete one.
-const PARTIAL_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
-const MAX_CACHE_KEYS = 16; // ~4 sources × 4 distinct queries
-const sourceCache = new Map<string, SourceCacheEntry>();
-
-// In-flight request dedupe: if two requests arrive while a source is being
-// warmed, both should `await` the same Promise rather than triggering two
-// concurrent upstream-page-walks. Without this, the first user request and
-// startup warming can race and double the cache-warm cost.
-const inflight = new Map<string, Promise<Document[]>>();
-
-const cacheKey = (source: SourceKey, query?: string): string => `${source}|${query || ''}`;
-
-// ============================================================================
-//  Sort
-// ============================================================================
-//
-// `sortBy` is the frontend-facing column name; we sort the merged Document[]
-// in memory rather than relying on each upstream source's per-source order.
-// (Upstream native SQL queries can sort by raw DB column — but those names
-// vary per source, and combining differently-sorted per-source lists is what
-// caused the previous "clumped by type" UX bug.)
-
-const sortDocuments = (docs: Document[], sortBy: string, sortDirection: string): void => {
-  const direction = sortDirection.toLowerCase() === 'asc' ? 1 : -1;
-  const cmp = (a: Document, b: Document): number => {
-    if (sortBy === 'year') return (a.year || 0) - (b.year || 0);
-    if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '', 'sv');
-    if (sortBy === 'location') return (a.location || '').localeCompare(b.location || '', 'sv');
-    return 0;
-  };
-  docs.sort((a, b) => direction * cmp(a, b));
+/**
+ * Relevance is scored with the best match lowest, so ascending is best first.
+ * Sending DESC alongside it returns the worst matches first.
+ */
+const toUpstreamDirection = (sortBy: string, sortDirection: string | undefined): string => {
+  if (sortBy === 'relevance') return 'ASC';
+  return sortDirection?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 };
 
-// ============================================================================
-//  Upstream pagination helpers
-// ============================================================================
-
-interface UpstreamMeta {
-  page: number;
-  limit: number;
-  count: number;
-  totalRecords: number;
-  totalPages: number;
-}
-
-// 1000 is the gateway's hard ceiling ("Page limit cannot be greater than 1000").
-// Use all of it: the per-minute request quota, not payload size, is the binding
-// constraint, so halving the page count halves the cost of a full warm.
-const UPSTREAM_PAGE_LIMIT = 1000;
-const FETCH_CONCURRENCY = 8;
-
-const buildUpstreamQuery = (
-  query: string | undefined,
-  page: number,
-  limit: number,
-  extra?: Record<string, string>,
-): string => {
-  const params = new URLSearchParams();
-  if (query) params.set('query', query);
-  params.set('page', String(page));
-  params.set('limit', String(limit));
-  if (extra) for (const [k, v] of Object.entries(extra)) params.set(k, v);
-  return `?${params.toString()}`;
+/**
+ * The frontend's type names, mapped back to the upstream objectType values that
+ * /objects filters on. Foto and Föremål share one upstream collection.
+ */
+const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
+  Photo: 'Foto',
+  Object: 'Föremål',
+  Film: 'Film',
+  Audio: 'Ljud',
+  Text: 'Text',
+  Publication: 'Publikation',
+  Person: 'Person',
+  Seaman: 'Sjöman',
+  LegalEntity: 'Juridisk person',
 };
 
-const evictOldestIfNeeded = (): void => {
-  if (sourceCache.size <= MAX_CACHE_KEYS) return;
-  let oldestKey: string | undefined;
-  let oldestTs = Infinity;
-  for (const [k, v] of sourceCache.entries()) {
-    if (v.fetchedAt < oldestTs) {
-      oldestTs = v.fetchedAt;
-      oldestKey = k;
-    }
-  }
-  if (oldestKey) sourceCache.delete(oldestKey);
-};
+const countFor = (typeCounts: TypeCount[] | undefined, objectType: string): number =>
+  typeCounts?.find(c => c.objectType === objectType)?.count ?? 0;
+
+const FILE_CACHE_CONTROL = 'public, max-age=86400';
 
 // ============================================================================
 
@@ -142,173 +76,10 @@ export class DocumentController {
   private readonly apiService = new ApiService();
 
   /**
-   * Fetch every page of an upstream collection, in parallel batches, and
-   * concatenate. Returns the raw upstream items (not yet mapped to Document)
-   * alongside the count of pages that could not be retrieved.
+   * Unified search across every document type.
    *
-   * A single failed page must not cost the whole collection: publications is
-   * 20k+ records across ~21 pages, and losing all of it because page 17 was
-   * throttled leaves the UI empty. Failures are tolerated per page and reported
-   * so the caller can shorten the cache lifetime instead.
-   */
-  private async fetchAllPages<T>(
-    buildUrl: (page: number) => string,
-    itemsKey: string,
-  ): Promise<{ items: T[]; missingPages: number }> {
-    // First page tells us the total count. This one is not optional — without it
-    // we don't know how far the collection runs.
-    const first = await this.apiService.get<Record<string, unknown> & { _meta?: UpstreamMeta }>({ url: buildUrl(1) });
-    const items: T[] = [...((first.data[itemsKey] as T[] | undefined) ?? [])];
-    const totalPages = first.data._meta?.totalPages ?? 1;
-    if (totalPages <= 1) return { items, missingPages: 0 };
-
-    // Fetch the rest concurrently to keep cache-warm time tolerable.
-    let missingPages = 0;
-    const remaining = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-    for (let i = 0; i < remaining.length; i += FETCH_CONCURRENCY) {
-      const batch = remaining.slice(i, i + FETCH_CONCURRENCY);
-      const results = await Promise.allSettled(
-        batch.map(page => this.apiService.get<Record<string, unknown>>({ url: buildUrl(page) })),
-      );
-      for (const r of results) {
-        if (r.status === 'rejected') {
-          missingPages++;
-          continue;
-        }
-        const list = r.value.data[itemsKey] as T[] | undefined;
-        if (list && list.length > 0) items.push(...list);
-      }
-    }
-    return { items, missingPages };
-  }
-
-  /**
-   * Returns the (possibly cached) full list of Documents for one source,
-   * filtered by `query`. Populates the module-level cache on miss.
-   *
-   * Concurrent calls for the same key share a single in-flight Promise so we
-   * never trigger two parallel cache warms.
-   */
-  private async fetchSource(source: SourceKey, query: string | undefined): Promise<Document[]> {
-    const key = cacheKey(source, query);
-    const cached = sourceCache.get(key);
-    if (cached) {
-      const ttl = cached.partial ? PARTIAL_CACHE_TTL_MS : CACHE_TTL_MS;
-      if (Date.now() - cached.fetchedAt < ttl) return cached.documents;
-    }
-
-    const pending = inflight.get(key);
-    if (pending) return pending;
-
-    const promise = this.fetchSourceUncached(source, query)
-      .then(({ documents, partial }) => {
-        // Never let an incomplete refresh shrink what we already serve.
-        const keepOld = partial && documents.length < (cached?.documents.length ?? 0);
-        const entry: SourceCacheEntry = keepOld
-          ? { ...cached!, fetchedAt: Date.now(), partial: true }
-          : { documents, fetchedAt: Date.now(), partial };
-
-        sourceCache.set(key, entry);
-        evictOldestIfNeeded();
-        logger.info(
-          `Cached source=${source} query="${query || ''}" → ${entry.documents.length} docs` +
-            `${entry.partial ? ' (partial)' : ''}${keepOld ? ' — kept previous, refresh was short' : ''}`,
-        );
-        return entry.documents;
-      })
-      .finally(() => {
-        inflight.delete(key);
-      });
-    inflight.set(key, promise);
-    return promise;
-  }
-
-  /**
-   * Walk one upstream collection and map it to Documents. `collection` doubles
-   * as the URL segment and the key the items arrive under (`photos`, `texts`, …).
-   */
-  private async collect<T>(
-    collection: string,
-    query: string | undefined,
-    extra: Record<string, string> | undefined,
-    map: (items: T[]) => Document[],
-  ): Promise<{ documents: Document[]; missingPages: number }> {
-    const url = (page: number): string =>
-      `${getApiBase('memories')}/${MUNICIPALITY_ID}/${collection}` +
-      buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT, extra);
-
-    const { items, missingPages } = await this.fetchAllPages<T>(url, collection);
-    return { documents: map(items), missingPages };
-  }
-
-  private async fetchSourceUncached(
-    source: SourceKey,
-    query: string | undefined,
-  ): Promise<{ documents: Document[]; partial: boolean }> {
-    // `photo` and `object` are the same endpoint split by objectType.
-    const collect = (): Promise<{ documents: Document[]; missingPages: number }> => {
-      switch (source) {
-        case 'film':
-          return this.collect<Film>('films', query, undefined, mapFilmsToDocuments);
-        case 'publication':
-          return this.collect<Publication>('publications', query, undefined, mapPublicationsToDocuments);
-        case 'photo':
-          return this.collect<Photo>('photos', query, { objectType: 'Foto' }, mapPhotosToDocuments);
-        case 'object':
-          return this.collect<Photo>('photos', query, { objectType: 'Föremål' }, mapPhotosToDocuments);
-        case 'audio':
-          return this.collect<Audio>('audios', query, undefined, mapAudiosToDocuments);
-        case 'text':
-          return this.collect<Text>('texts', query, undefined, mapTextsToDocuments);
-      }
-    };
-
-    try {
-      const { documents, missingPages } = await collect();
-      if (missingPages > 0) {
-        logger.warn(
-          `Incomplete fetch for source=${source} query="${query || ''}": ${missingPages} page(s) unavailable — ` +
-            `serving ${documents.length} docs, retrying in ${PARTIAL_CACHE_TTL_MS / 60000} min`,
-        );
-      }
-      return { documents, partial: missingPages > 0 };
-    } catch (e) {
-      // Only page 1 reaches here — later pages degrade to `missingPages` instead.
-      // Without page 1 there is nothing to serve, so mark partial to retry soon.
-      logger.warn(`Failed to populate cache for source=${source} query=${query || ''}: ${(e as Error).message}`);
-      return { documents: [], partial: true };
-    }
-  }
-
-  /**
-   * Trigger a background warm of the empty-query cache for all four sources.
-   * Call once at app start so the first user doesn't pay the warm cost.
-   * Errors are swallowed so a slow upstream doesn't crash the server boot.
-   */
-  async warmCache(): Promise<void> {
-    logger.info('Warming document cache (background)…');
-    const t0 = Date.now();
-    try {
-      await Promise.all([
-        this.fetchSource('film', undefined),
-        this.fetchSource('publication', undefined),
-        this.fetchSource('photo', undefined),
-        this.fetchSource('object', undefined),
-        this.fetchSource('audio', undefined),
-        this.fetchSource('text', undefined),
-      ]);
-      logger.info(`Document cache warm complete in ${Date.now() - t0}ms`);
-    } catch (e) {
-      logger.warn(`Document cache warm failed: ${(e as Error).message}`);
-    }
-  }
-
-  /**
-   * Unified search across films, publications, photos and objects.
-   *
-   * All paging slices a fully-cached, fully-sorted in-memory list — accurate
-   * `totalPages`, exactly `pageSize` items per page, type filter is just a
-   * different cache slice.
+   * Sorting, pagination and the per-type counts all come from upstream, so a
+   * page of results costs exactly one request no matter how many types match.
    */
   @Get('/documents')
   async searchDocuments(
@@ -318,67 +89,55 @@ export class DocumentController {
     @QueryParam('type') type: string,
     @QueryParam('sortBy') sortBy: string,
     @QueryParam('sortDirection') sortDirection: string,
+    @QueryParam('yearFrom') yearFrom: number,
+    @QueryParam('yearTo') yearTo: number,
+    @QueryParam('location') location: string,
+    @QueryParam('creator') creator: string,
     @Res() response: Response,
   ) {
-    const trimmedQuery = query?.trim() || undefined;
+    const safePageSize = Math.max(1, pageSize);
+    const safePage = Math.max(1, page);
 
-    // Always warm all sources so chip counts stay accurate even when a
-    // type filter is selected.
-    const [films, publications, photos, objects, audios, texts] = await Promise.all([
-      this.fetchSource('film', trimmedQuery),
-      this.fetchSource('publication', trimmedQuery),
-      this.fetchSource('photo', trimmedQuery),
-      this.fetchSource('object', trimmedQuery),
-      this.fetchSource('audio', trimmedQuery),
-      this.fetchSource('text', trimmedQuery),
-    ]);
-
-    // Type filter narrows which cache slice we paginate over.
-    let docs: Document[];
-    switch (type) {
-      case 'Film':
-        docs = [...films];
-        break;
-      case 'Publication':
-        docs = [...publications];
-        break;
-      case 'Photo':
-        docs = [...photos];
-        break;
-      case 'Object':
-        docs = [...objects];
-        break;
-      case 'Audio':
-        docs = [...audios];
-        break;
-      case 'Text':
-        docs = [...texts];
-        break;
-      default:
-        docs = [...films, ...publications, ...photos, ...objects, ...audios, ...texts];
+    const params = new URLSearchParams();
+    params.set('page', String(safePage));
+    params.set('limit', String(safePageSize));
+    const upstreamSort = toUpstreamSort(sortBy);
+    if (upstreamSort) {
+      params.set('sortBy', upstreamSort);
+      params.set('sortDirection', toUpstreamDirection(upstreamSort, sortDirection));
     }
 
-    if (sortBy) sortDocuments(docs, sortBy, sortDirection || 'desc');
+    const trimmedQuery = query?.trim();
+    if (trimmedQuery) params.set('query', trimmedQuery);
+    if (yearFrom) params.set('yearFrom', String(yearFrom));
+    if (yearTo) params.set('yearTo', String(yearTo));
+    if (location?.trim()) params.set('location', location.trim());
+    if (creator?.trim()) params.set('creator', creator.trim());
 
-    const total = docs.length;
-    const safePageSize = Math.max(1, pageSize);
-    const totalPages = Math.max(1, Math.ceil(total / safePageSize));
-    const safePage = Math.min(Math.max(1, page), totalPages);
-    const start = (safePage - 1) * safePageSize;
-    const slice = docs.slice(start, start + safePageSize);
+    // Restrict to the requested type, or to the document types when none is
+    // given. Registers hold about 174k of the 205k records, so without this a
+    // plain search would return mostly persons and seamen.
+    const requestedObjectType = type ? DOCUMENT_TYPE_TO_OBJECT_TYPE[type] : undefined;
+    for (const objectType of requestedObjectType ? [requestedObjectType] : DOCUMENT_OBJECT_TYPES) {
+      params.append('objectType', objectType);
+    }
+
+    const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/objects?${params.toString()}`;
+    const res = await this.apiService.get<CombinedObjectResponse>({ url });
+    const { objects = [], typeCounts, _meta } = res.data;
 
     return response.send({
-      data: slice,
-      total,
-      totalPages,
-      filmTotal: films.length,
-      publicationTotal: publications.length,
-      photoTotal: photos.length,
-      objectTotal: objects.length,
-      audioTotal: audios.length,
-      textTotal: texts.length,
-      page: safePage,
-      pageSize: safePageSize,
+      data: mapCombinedObjectsToDocuments(objects),
+      total: _meta?.totalRecords ?? objects.length,
+      totalPages: _meta?.totalPages ?? 1,
+      filmTotal: countFor(typeCounts, 'Film'),
+      publicationTotal: countFor(typeCounts, 'Publikation'),
+      photoTotal: countFor(typeCounts, 'Foto'),
+      objectTotal: countFor(typeCounts, 'Föremål'),
+      audioTotal: countFor(typeCounts, 'Ljud'),
+      textTotal: countFor(typeCounts, 'Text'),
+      page: _meta?.page ?? safePage,
+      pageSize: _meta?.limit ?? safePageSize,
       message: 'success',
     });
   }
@@ -420,6 +179,14 @@ export class DocumentController {
       const textId = this.extractNumericId(id, 'text-');
       const res = await this.apiService.get<Text>({ url: `${base}/${MUNICIPALITY_ID}/texts/${textId}` });
       return response.send({ data: mapTextToDocument(res.data), message: 'success' });
+    }
+
+    // Register records (person-, jurpers-, sjoman-) are searchable through
+    // /objects but have no document representation, so there is nothing to
+    // render. Answer 404 rather than falling through to the film branch, which
+    // would report the id as malformed.
+    if (/^[a-z]+-/.test(id) && !id.startsWith('film-')) {
+      throw new HttpException(404, 'Not found');
     }
 
     const filmId = this.extractNumericId(id.startsWith('film-') ? id : `film-${id}`, 'film-');
@@ -476,6 +243,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
+    response.setHeader('Cache-Control', FILE_CACHE_CONTROL);
     // Preserve 206 when upstream serves a partial response.
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
@@ -517,6 +285,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
+    response.setHeader('Cache-Control', FILE_CACHE_CONTROL);
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
     return response;
@@ -556,6 +325,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
+    response.setHeader('Cache-Control', FILE_CACHE_CONTROL);
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
     return response;

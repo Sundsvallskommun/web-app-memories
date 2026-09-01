@@ -50,6 +50,8 @@ export interface Document {
   // Pending upstream support — backend may emit undefined for now.
   archiveCollection?: string;
   institution?: string;
+  // Record creation date ("Skapad" in the design). Not carried by the API yet.
+  created?: string;
   // Structured citation (Publication only).
   publication?: PublicationCitation;
   source?: string;
@@ -65,7 +67,8 @@ export interface Document {
 export interface SearchParams {
   query?: string;
   type?: DocumentType;
-  sortBy?: 'year' | 'title' | 'location';
+  // Constrained to the fields the combined search can sort on.
+  sortBy?: 'year' | 'title' | 'objectType';
   sortDirection?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;

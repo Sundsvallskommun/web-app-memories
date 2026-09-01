@@ -4,30 +4,42 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import DefaultLayout from '@layouts/default-layout/default-layout.component';
 import Main from '@layouts/main/main.component';
-import {
-  SearchField,
-  Button,
-  Spinner,
-  Pagination,
-  Select,
-  Chip,
-  Table,
-} from '@sk-web-gui/react';
-import { Search, X, ArrowUpDown } from 'lucide-react';
+import { Alert, SearchField, Button, Pagination, Select, Chip, PopupMenu, Filter } from '@sk-web-gui/react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, DocumentType, SearchParams, SearchResult } from '@data-contracts/document';
+import { DocumentCard } from '@components/document-card/document-card.component';
+import { DocumentCardSkeleton } from '@components/document-card/document-card-skeleton.component';
 import { searchDocuments } from '@services/document-service';
 
 const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
-const SORT_KEYS = ['year', 'title', 'location'] as const;
+
+const GRID_CLASS = 'flex flex-wrap list-none p-0 gap-24';
+const GRID_ITEM_CLASS = 'flex w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[calc(25%-18px)]';
+const SORT_KEYS = ['year', 'title', 'objectType'] as const;
+
+interface SortOption {
+  value: string;
+  label: string;
+  sortBy?: SortBy;
+  sortDirection?: SortDirection;
+  disabled?: boolean;
+}
+
+const SORT_OPTIONS: SortOption[] = [
+  { value: 'year-desc', label: 'Nyast först', sortBy: 'year', sortDirection: 'desc' },
+  { value: 'year-asc', label: 'Äldst först', sortBy: 'year', sortDirection: 'asc' },
+  { value: 'title-asc', label: 'Titel / Namn A-Ö', sortBy: 'title', sortDirection: 'asc' },
+  // Awaiting `location` in the API's sortBy. The field is on the record already.
+  { value: 'plats', label: 'Plats (kommer senare)', disabled: true },
+  { value: 'objectType-asc', label: 'Kategori', sortBy: 'objectType', sortDirection: 'asc' },
+];
 type SortBy = (typeof SORT_KEYS)[number];
 type SortDirection = 'asc' | 'desc';
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const PAGE_SIZE_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 // Defaults; these are elided from the URL so a plain `/sv` stays clean.
 const DEFAULT_PAGE = 1;
-const DEFAULT_PAGE_SIZE = 10;
-const DEFAULT_SORT_BY: SortBy = 'year';
-const DEFAULT_SORT_DIR: SortDirection = 'desc';
+const DEFAULT_PAGE_SIZE = 12;
 
 // ---------------------------------------------------------------------------
 // URL-param parsing helpers. All six pieces of search state live in the URL
@@ -38,10 +50,11 @@ const DEFAULT_SORT_DIR: SortDirection = 'desc';
 const parseType = (raw: string | null): DocumentType | undefined =>
   raw && (TYPES as readonly string[]).includes(raw) ? (raw as DocumentType) : undefined;
 
-const parseSortBy = (raw: string | null): SortBy =>
-  raw && (SORT_KEYS as readonly string[]).includes(raw) ? (raw as SortBy) : DEFAULT_SORT_BY;
+const parseSortBy = (raw: string | null): SortBy | undefined =>
+  raw && (SORT_KEYS as readonly string[]).includes(raw) ? (raw as SortBy) : undefined;
 
-const parseSortDir = (raw: string | null): SortDirection => (raw === 'asc' ? 'asc' : DEFAULT_SORT_DIR);
+const parseSortDir = (raw: string | null): SortDirection | undefined =>
+  raw === 'asc' || raw === 'desc' ? raw : undefined;
 
 const parsePage = (raw: string | null): number => {
   const n = Number(raw);
@@ -50,7 +63,7 @@ const parsePage = (raw: string | null): number => {
 
 const parseSize = (raw: string | null): number => {
   const n = Number(raw);
-  return (PAGE_SIZE_OPTIONS as readonly number[]).includes(n) ? n : DEFAULT_PAGE_SIZE;
+  return PAGE_SIZE_OPTIONS.includes(n) ? n : DEFAULT_PAGE_SIZE;
 };
 
 const SearchPage: React.FC = () => {
@@ -76,6 +89,8 @@ const SearchPage: React.FC = () => {
     setQueryDraft(query);
   }, [query]);
 
+  const [failed, setFailed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
 
@@ -90,19 +105,22 @@ const SearchPage: React.FC = () => {
       }
       // When filters/sort change, always return to page 1 — offsets aren't
       // meaningful across different result sets.
-      if (!('page' in patch) && ('type' in patch || 'sort' in patch || 'dir' in patch || 'size' in patch || 'q' in patch)) {
+      if (
+        !('page' in patch) &&
+        ('type' in patch || 'sort' in patch || 'dir' in patch || 'size' in patch || 'q' in patch)
+      ) {
         next.delete('page');
       }
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
-    [searchParams, router, pathname],
+    [searchParams, router, pathname]
   );
 
   // Single searcher: fires whenever any URL-backed state changes.
   const searchKey = useMemo(
     () => JSON.stringify({ query, selectedType, sortBy, sortDirection, page, pageSize }),
-    [query, selectedType, sortBy, sortDirection, page, pageSize],
+    [query, selectedType, sortBy, sortDirection, page, pageSize]
   );
 
   useEffect(() => {
@@ -116,9 +134,13 @@ const SearchPage: React.FC = () => {
       pageSize,
     };
     setLoading(true);
+    setFailed(false);
     searchDocuments(params)
       .then((res) => {
         if (!cancelled) setResult(res);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -126,7 +148,7 @@ const SearchPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [searchKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchKey, retryToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = () => {
     const trimmed = queryDraft.trim();
@@ -141,14 +163,21 @@ const SearchPage: React.FC = () => {
     updateParams({ page: newPage > 1 ? String(newPage) : undefined });
   };
 
-  const toggleSortDirection = () => {
-    const next = sortDirection === 'asc' ? 'desc' : 'asc';
-    updateParams({ dir: next === DEFAULT_SORT_DIR ? undefined : next });
+  const handleSortToggle = (value: string) => {
+    const option = SORT_OPTIONS.find((o) => o.value === value);
+    if (!option?.sortBy || !option.sortDirection) return;
+    const clearing = activeSort === value;
+    updateParams({
+      sort: clearing ? undefined : option.sortBy,
+      dir: clearing ? undefined : option.sortDirection,
+    });
   };
 
-  const handleSortByChange = (next: SortBy) => {
-    updateParams({ sort: next === DEFAULT_SORT_BY ? undefined : next });
-  };
+  // Which option the URL state corresponds to, or undefined for relevance.
+  const activeSort =
+    sortBy && sortDirection ?
+      SORT_OPTIONS.find((o) => o.sortBy === sortBy && o.sortDirection === sortDirection)?.value
+    : undefined;
 
   const handlePageSizeChange = (next: number) => {
     updateParams({ size: next === DEFAULT_PAGE_SIZE ? undefined : String(next) });
@@ -176,7 +205,9 @@ const SearchPage: React.FC = () => {
           {/* Search field */}
           <div>
             <h1 className="text-h2-sm md:text-h2-md mb-md">Sök i Sundsvallsminnen</h1>
-            <p className="text-body mb-lg">Sök bland filmer, publikationer, fotografier, föremål, ljud och texter i Sundsvalls arkiv.</p>
+            <p className="text-body mb-lg">
+              Sök bland filmer, publikationer, fotografier, föremål, ljud och texter i Sundsvalls arkiv.
+            </p>
 
             <div className="flex gap-sm items-end">
               <div className="flex-grow">
@@ -244,12 +275,18 @@ const SearchPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-sm flex-wrap">
-                <label className="text-label-small text-dark-secondary inline-flex items-center gap-xs">
-                  Per sida
+                <div className="flex items-center gap-sm">
+                  <label
+                    htmlFor="page-size"
+                    className="text-label-medium text-dark-secondary inline-flex items-center gap-xs"
+                  >
+                    Per sida
+                  </label>
                   <Select
                     size="sm"
                     value={String(pageSize)}
                     onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    id="page-size"
                     data-cy="page-size-select"
                   >
                     {PAGE_SIZE_OPTIONS.map((n) => (
@@ -258,69 +295,90 @@ const SearchPage: React.FC = () => {
                       </Select.Option>
                     ))}
                   </Select>
-                </label>
+                </div>
 
-                <Select size="sm" value={sortBy} onChange={(e) => handleSortByChange(e.target.value as SortBy)}>
-                  <Select.Option value="year">Sortera efter år</Select.Option>
-                  <Select.Option value="title">Sortera efter titel</Select.Option>
-                  <Select.Option value="location">Sortera efter plats</Select.Option>
-                </Select>
-
-                <Button
-                  variant="tertiary"
-                  size="sm"
-                  onClick={toggleSortDirection}
-                  aria-label={sortDirection === 'asc' ? 'Stigande ordning' : 'Fallande ordning'}
-                  iconButton
-                >
-                  <ArrowUpDown size={16} />
-                </Button>
+                <div className="relative">
+                  <PopupMenu>
+                    <PopupMenu.Button variant="ghost" size="md" rightIcon={<ChevronDown size={16} />}>
+                      Sortering
+                    </PopupMenu.Button>
+                    <PopupMenu.Panel className="w-[260px]">
+                      <Filter
+                        data-cy="sort-filter"
+                        className="[&_.sk-form-checkbox]:order-last [&_.sk-form-checkbox]:!mr-8"
+                      >
+                        <Filter.Label className="sr-only">Sortera efter</Filter.Label>
+                        {SORT_OPTIONS.map((o) => (
+                          <Filter.Item
+                            key={o.value}
+                            checked={activeSort === o.value}
+                            disabled={o.disabled}
+                            labelPosition="left"
+                            onChange={() => handleSortToggle(o.value)}
+                          >
+                            {o.label}
+                          </Filter.Item>
+                        ))}
+                      </Filter>
+                    </PopupMenu.Panel>
+                  </PopupMenu>
+                </div>
               </div>
             </div>
 
             {loading && (
-              <div className="flex justify-center py-xl">
-                <Spinner aria-label="Laddar sökresultat" />
+              <ul className={GRID_CLASS} aria-busy="true" aria-label="Laddar sökresultat">
+                {Array.from({ length: pageSize }, (_, i) => (
+                  <li key={i} className={GRID_ITEM_CLASS}>
+                    <DocumentCardSkeleton />
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {!loading && failed && (
+              <div role="alert" data-cy="search-error">
+                <Alert type="warning">
+                  <Alert.Icon />
+                  <Alert.Content>
+                    <Alert.Content.Title>Sökningen kunde inte genomföras</Alert.Content.Title>
+                    <Alert.Content.Description>Det gick inte att hämta träffar just nu.</Alert.Content.Description>
+
+                    <Button variant="link" size="sm" className="mt-xs" onClick={() => setRetryToken((t) => t + 1)}>
+                      Försök igen
+                    </Button>
+                  </Alert.Content>
+
+                  <Button
+                    iconButton
+                    variant="tertiary"
+                    size="sm"
+                    aria-label="Stäng meddelandet"
+                    onClick={() => setFailed(false)}
+                  >
+                    <X size={20} />
+                  </Button>
+                </Alert>
               </div>
             )}
 
-            {/* Results table */}
-            {!loading && result && result.documents.length > 0 && (
-              <Table scrollable={false}>
-                <Table.Header>
-                  <Table.HeaderColumn className="w-[8%]">År</Table.HeaderColumn>
-                  <Table.HeaderColumn className="w-[60%]">Titel</Table.HeaderColumn>
-                  <Table.HeaderColumn className="w-[20%]">Plats</Table.HeaderColumn>
-                  <Table.HeaderColumn className="w-[12%]">Typ</Table.HeaderColumn>
-                </Table.Header>
-                <Table.Body>
-                  {result.documents.map((doc) => (
-                    <Table.Row
-                      key={doc.id}
-                      className="cursor-pointer hover:bg-background-200"
-                      onClick={() => router.push(`/dokument/${doc.id}`)}
-                    >
-                      <Table.Column>{doc.year || '—'}</Table.Column>
-                      <Table.Column>
-                        <p className="font-bold line-clamp-2">{doc.title || '(Utan titel)'}</p>
-                      </Table.Column>
-                      <Table.Column className="break-words">{doc.location}</Table.Column>
-                      <Table.Column>
-                        <Chip>{DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type}</Chip>
-                      </Table.Column>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table>
+            {!loading && !failed && !!result?.documents?.length && (
+              <ul className={GRID_CLASS} data-cy="document-grid">
+                {result.documents.map((doc) => (
+                  <li key={doc.id} className={GRID_ITEM_CLASS}>
+                    <DocumentCard doc={doc} />
+                  </li>
+                ))}
+              </ul>
             )}
 
-            {!loading && result && result.documents.length === 0 && (
+            {!loading && !failed && result?.documents?.length === 0 && (
               <div className="text-center py-xl">
-                <p className="text-body text-dark-secondary">Inga träffar hittades. Prova att ändra dina sökkriterier.</p>
+                <p className="text-dark-secondary">Inga träffar hittades. Prova att ändra dina sökkriterier.</p>
               </div>
             )}
 
-            {!loading && result && totalPages > 1 && (
+            {!loading && !failed && result && totalPages > 1 && (
               <div className="flex justify-center mt-lg">
                 <Pagination pages={totalPages} activePage={page} changePage={handlePageChange} />
               </div>
