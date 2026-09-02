@@ -250,9 +250,19 @@ const buildPublicationFiles = (pub: Publication): DocumentFile[] | undefined => 
 const buildPhotoFiles = (photo: Photo): DocumentFile[] | undefined => {
   const files: DocumentFile[] = [];
   if (photo.largeImageFilename)
-    files.push({ filename: photo.largeImageFilename, format: 'Stor bild', size: '', variant: 'large' });
+    files.push({
+      filename: photo.largeImageFilename,
+      format: formatLabel(photo.largeImageFilename, 'Bild'),
+      size: '',
+      variant: 'large',
+    });
   if (photo.thumbnailFilename)
-    files.push({ filename: photo.thumbnailFilename, format: 'Miniatyr', size: '', variant: 'thumbnail' });
+    files.push({
+      filename: photo.thumbnailFilename,
+      format: formatLabel(photo.thumbnailFilename, 'Bild'),
+      size: '',
+      variant: 'thumbnail',
+    });
   return files.length > 0 ? files : undefined;
 };
 
@@ -381,10 +391,26 @@ export const mapAudiosToDocuments = (audios: Audio[]): Document[] => audios.map(
 const buildTextFiles = (text: Text): DocumentFile[] | undefined => {
   const files: DocumentFile[] = [];
   if (text.largeImageFilename)
-    files.push({ filename: text.largeImageFilename, format: 'Stor bild', size: '', variant: 'large' });
+    files.push({
+      filename: text.largeImageFilename,
+      format: formatLabel(text.largeImageFilename, 'Bild'),
+      size: '',
+      variant: 'large',
+    });
   if (text.thumbnailFilename)
-    files.push({ filename: text.thumbnailFilename, format: 'Miniatyr', size: '', variant: 'thumbnail' });
-  if (text.ocrFilename) files.push({ filename: text.ocrFilename, format: 'Text/XML', size: '', variant: 'text' });
+    files.push({
+      filename: text.thumbnailFilename,
+      format: formatLabel(text.thumbnailFilename, 'Bild'),
+      size: '',
+      variant: 'thumbnail',
+    });
+  if (text.ocrFilename)
+    files.push({
+      filename: text.ocrFilename,
+      format: formatLabel(text.ocrFilename, 'Text'),
+      size: '',
+      variant: 'text',
+    });
   return files.length > 0 ? files : undefined;
 };
 
