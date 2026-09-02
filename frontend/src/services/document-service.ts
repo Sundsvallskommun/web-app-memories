@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { Document, SearchParams, SearchResult } from '@data-contracts/document';
 import { apiService } from '@services/api-service';
 
@@ -51,7 +52,8 @@ export const getDocumentById = async (id: string): Promise<Document | null> => {
   try {
     const response = await apiService.get<{ data: Document; message: string }>(`documents/${id}`);
     return response?.data?.data || null;
-  } catch {
-    return null;
+  } catch (e) {
+    if (axios.isAxiosError(e) && e.response?.status === 404) return null;
+    throw e;
   }
 };

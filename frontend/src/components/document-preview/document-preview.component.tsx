@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@sk-web-gui/react';
 import { Document, DocumentFile } from '@data-contracts/document';
 import { apiURL } from '@utils/api-url';
 
@@ -17,7 +16,7 @@ import { apiURL } from '@utils/api-url';
 // MIME on the Document model. Browsers render application/pdf inline
 // natively when the API sets Content-Disposition: inline.
 
-export type Variant = 'large' | 'thumbnail';
+type Variant = 'large' | 'thumbnail';
 
 const fileUrl = (docId: string, variant: string): string => apiURL(`documents/${docId}/file?variant=${variant}`);
 
@@ -37,17 +36,11 @@ const imageVariants = (doc: Document): Variant[] => {
   return out;
 };
 
-export const VARIANT_LABELS: Record<Variant, string> = {
-  large: 'Stor',
-  thumbnail: 'Liten',
-};
-
 interface Props {
   doc: Document;
-  onVariantChange?: (variant: Variant | undefined) => void;
 }
 
-export const DocumentPreview: React.FC<Props> = ({ doc, onVariantChange }) => {
+export const DocumentPreview: React.FC<Props> = ({ doc }) => {
   if (doc.type === 'Audio') {
     return (
       <div className="w-full flex justify-center" data-cy="document-preview-audio">
@@ -69,18 +62,14 @@ export const DocumentPreview: React.FC<Props> = ({ doc, onVariantChange }) => {
     : textIsPdf ? 'text'
     : undefined;
   const showImage = !largeIsPdf && imageVariants(doc).length > 0;
-  // HtmlPreview is only for transformed text/XML; if the text variant is a PDF
-  // we show it via PdfPreview instead (sandbox on HtmlPreview blocks the
-  // browser's built-in PDF viewer from rendering).
-  const showText = !!textFile && !textIsPdf;
 
-  if (!pdfVariant && !showImage && !showText) return null;
+  if (!pdfVariant && !showImage) return null;
 
   return (
-    <div className="flex flex-col gap-md" data-cy="document-preview">
-      {pdfVariant && <PdfPreview docId={doc.id} title={doc.title} variant={pdfVariant} />}
-      {showImage && <ImagePreview doc={doc} onVariantChange={onVariantChange} />}
-      {showText && <HtmlPreview docId={doc.id} title={doc.title} />}
+    <div className="w-full flex flex-col gap-md" data-cy="document-preview">
+      {pdfVariant ?
+        <PdfPreview docId={doc.id} title={doc.title} variant={pdfVariant} />
+      : <ImagePreview doc={doc} />}
     </div>
   );
 };
@@ -95,34 +84,14 @@ const PdfPreview: React.FC<{ docId: string; title: string; variant: string }> = 
   </div>
 );
 
-const HtmlPreview: React.FC<{ docId: string; title: string }> = ({ docId, title }) => (
-  <div className="w-full" data-cy="preview-text">
-    <iframe
-      src={fileUrl(docId, 'text')}
-      title={title ? `${title} (text)` : 'Textförhandsvisning'}
-      sandbox="allow-same-origin"
-      className="w-full h-[60vh] rounded-cards bg-white"
-    />
-  </div>
-);
-
-const ImagePreview: React.FC<{ doc: Document; onVariantChange?: (variant: Variant | undefined) => void }> = ({
-  doc,
-  onVariantChange,
-}) => {
+const ImagePreview: React.FC<{ doc: Document }> = ({ doc }) => {
   const variants = useMemo(() => imageVariants(doc), [doc]);
-  const [selected, setSelected] = useState<Variant | undefined>(variants[0]);
+  const selected = variants[0];
   const [failed, setFailed] = useState(false);
 
-  // Reset state when the doc changes (navigating between records).
   useEffect(() => {
-    setSelected(variants[0]);
     setFailed(false);
-  }, [doc.id, variants]);
-
-  useEffect(() => {
-    onVariantChange?.(selected);
-  }, [selected, onVariantChange]);
+  }, [doc.id]);
 
   if (!selected) return null;
 
@@ -143,38 +112,6 @@ const ImagePreview: React.FC<{ doc: Document; onVariantChange?: (variant: Varian
         className="max-h-[80vh] w-auto rounded-cards"
         onError={() => setFailed(true)}
       />
-
-      {/* Only show the switch when the record has more than one image variant —
-          otherwise there's nothing to toggle between. */}
-      {variants.length > 1 && (
-        <div
-          className="inline-flex items-center gap-xs text-label-small text-dark-secondary"
-          role="group"
-          aria-label="Förhandsvisningsstorlek"
-          data-cy="preview-size-switch"
-        >
-          <span>Storlek:</span>
-          {variants.map((v) => {
-            const isActive = v === selected;
-            return (
-              <Button
-                key={v}
-                size="sm"
-                variant={isActive ? 'primary' : 'tertiary'}
-                color="primary"
-                onClick={() => {
-                  setFailed(false); // retry with the new variant if a load previously failed
-                  setSelected(v);
-                }}
-                aria-pressed={isActive}
-                data-cy={`preview-size-${v}`}
-              >
-                {VARIANT_LABELS[v]}
-              </Button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };

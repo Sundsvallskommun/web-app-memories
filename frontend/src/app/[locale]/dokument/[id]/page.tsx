@@ -8,7 +8,8 @@ import { Alert, Breadcrumb, Button } from '@sk-web-gui/react';
 import { ArrowLeft, Download } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, Document, DocumentType } from '@data-contracts/document';
 import { getDocumentById } from '@services/document-service';
-import { DocumentPreview, VARIANT_LABELS, Variant } from '@components/document-preview/document-preview.component';
+import { DocumentPreview } from '@components/document-preview/document-preview.component';
+import { DocumentFiles } from '@components/document-files/document-files.component';
 import { DocumentGallery } from '@components/document-gallery/document-gallery.component';
 import { DocumentRelated } from '@components/document-related/document-related.component';
 import { DownloadError, downloadDocumentFile } from '@utils/download-file';
@@ -32,30 +33,30 @@ const DocumentDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const [previewVariant, setPreviewVariant] = useState<Variant | undefined>(undefined);
+  const [failed, setFailed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     const id = params.id as string;
-    if (id) {
-      getDocumentById(id).then((result) => {
-        setDoc(result);
-        setLoading(false);
-      });
-    }
-  }, [params.id]);
+    if (!id) return;
+
+    setLoading(true);
+    setFailed(false);
+    getDocumentById(id)
+      .then(setDoc)
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
+  }, [params.id, retryToken]);
+
+  const primaryFile = doc?.files?.find((f) => f.variant === 'large') ?? doc?.files?.[0];
 
   const handleDownload = async () => {
-    if (!doc) return;
-    const file =
-      doc.files?.find((f) => f.variant === previewVariant) ??
-      doc.files?.find((f) => f.variant === 'large') ??
-      doc.files?.[0];
-    const filename = file?.filename ?? `${doc.id}.jpg`;
+    if (!doc || !primaryFile) return;
 
     setDownloadError(null);
     setDownloading(true);
     try {
-      await downloadDocumentFile(doc.id, filename, file?.variant);
+      await downloadDocumentFile(doc.id, primaryFile.filename, primaryFile.variant);
     } catch (e) {
       setDownloadError(e instanceof DownloadError ? e.message : 'Nedladdningen misslyckades.');
     } finally {
@@ -70,6 +71,27 @@ const DocumentDetailPage: React.FC = () => {
           <div className="bg-background-200 rounded-cards p-24 flex flex-col items-center gap-16">
             <div className="w-full max-w-2xl aspect-[4/3] bg-[#0000001f] animate-shimmer rounded-8" />
             <div className="h-16 w-64 bg-[#0000001f] animate-shimmer rounded-8" />
+          </div>
+        </Main>
+      </DefaultLayout>
+    );
+  }
+
+  if (failed) {
+    return (
+      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
+        <Main>
+          <div className="py-32" role="alert" data-cy="document-error">
+            <Alert type="warning">
+              <Alert.Icon />
+              <Alert.Content>
+                <Alert.Content.Title>Dokumentet kunde inte hämtas</Alert.Content.Title>
+                <Alert.Content.Description>Det gick inte att nå arkivet just nu.</Alert.Content.Description>
+                <Button variant="link" size="sm" className="mt-xs" onClick={() => setRetryToken((t) => t + 1)}>
+                  Försök igen
+                </Button>
+              </Alert.Content>
+            </Alert>
           </div>
         </Main>
       </DefaultLayout>
@@ -106,21 +128,23 @@ const DocumentDetailPage: React.FC = () => {
             </Breadcrumb.Item>
           </Breadcrumb>
           <h1 className="sr-only">{title}</h1>
-          <div className="bg-background-200 rounded-cards px-72 py-40 flex flex-col gap-32">
+          <div className="bg-background-200 rounded-cards px-16 py-24 flex flex-col gap-32 md:px-72 md:py-40">
             <div className="flex flex-col items-center gap-16">
-              <DocumentPreview doc={doc} onVariantChange={setPreviewVariant} />
+              <DocumentPreview doc={doc} />
 
               {doc.description && <p className="text-center font-bold">{doc.description}</p>}
 
-              <Button
-                color="primary"
-                rightIcon={<Download size={16} />}
-                onClick={handleDownload}
-                loading={downloading}
-                data-cy="document-download"
-              >
-                {previewVariant ? `Ladda ned (${VARIANT_LABELS[previewVariant]})` : 'Ladda ned'}
-              </Button>
+              {primaryFile && (
+                <Button
+                  color="primary"
+                  rightIcon={<Download size={16} />}
+                  onClick={handleDownload}
+                  loading={downloading}
+                  data-cy="document-download"
+                >
+                  Ladda ned
+                </Button>
+              )}
 
               {downloadError && (
                 <div role="alert" className="w-full max-w-2xl">
@@ -134,19 +158,19 @@ const DocumentDetailPage: React.FC = () => {
               )}
             </div>
 
-            <dl className="flex flex-col gap-4" data-cy="document-meta">
-              {metaRows(doc).map((row) => (
-                <div key={row.label} className="flex gap-8">
-                  <dt className="font-bold">{row.label}:</dt>
-                  <dd>{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-
-            {/* Extra media files (Text / TEXT_MULTI). Renders nothing for
-                documents without attached media. */}
+            <div className="flex flex-col gap-16">
+              <h2 className="text-h4-md">Detaljer</h2>
+              <dl className="flex flex-col gap-4" data-cy="document-meta">
+                {metaRows(doc).map((row) => (
+                  <div key={row.label} className="flex gap-8">
+                    <dt className="font-bold">{row.label}:</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <DocumentFiles doc={doc} />
             <DocumentGallery doc={doc} />
-
             <DocumentRelated doc={doc} />
           </div>
         </div>

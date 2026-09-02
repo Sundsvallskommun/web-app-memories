@@ -6,6 +6,7 @@ import { Button, Label, Table, SortMode } from '@sk-web-gui/react';
 import { ArrowRight, Download } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, Document, DocumentType } from '@data-contracts/document';
 import { getDocumentById } from '@services/document-service';
+import { ActionButton } from '@components/action-button/action-button.component';
 import { DownloadError, downloadDocumentFile } from '@utils/download-file';
 
 type SortKey = 'type' | 'title' | 'year' | 'location';
@@ -16,6 +17,28 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'year', label: 'Tidpunkt' },
   { key: 'location', label: 'Plats' },
 ];
+
+/**
+ * Column layout, one rule per intent.
+ *
+ * A table cell's className lands on an inner span, so hiding or sizing a whole
+ * column has to come from the wrapper. The strings stay literal because
+ * Tailwind scans source text for complete class names and generates nothing for
+ * anything built from variables.
+ */
+const TABLE_LAYOUT = [
+  // Tidpunkt holds a four-digit year and the actions are buttons, so both take
+  // their content's width and the rest goes to Titel and Plats.
+  '[&_th:nth-child(3)]:w-px [&_th:last-child]:w-px',
+  // Typ appears at lg
+  '[&_td:nth-child(1)]:hidden [&_th:nth-child(1)]:hidden lg:[&_td:nth-child(1)]:table-cell lg:[&_th:nth-child(1)]:table-cell',
+  // Tidpunkt appears at lg
+  '[&_td:nth-child(3)]:hidden [&_th:nth-child(3)]:hidden lg:[&_td:nth-child(3)]:table-cell lg:[&_th:nth-child(3)]:table-cell',
+  // Plats appears at md
+  '[&_td:nth-child(4)]:hidden [&_th:nth-child(4)]:hidden md:[&_td:nth-child(4)]:table-cell md:[&_th:nth-child(4)]:table-cell',
+  // The header, and with it sorting, appears once there is more than one column
+  '[&_thead]:hidden md:[&_thead]:table-header-group',
+].join(' ');
 
 const compare = (a: Document, b: Document, key: SortKey): number => {
   if (key === 'year') return (a.year || 0) - (b.year || 0);
@@ -41,8 +64,14 @@ export const DocumentRelated: React.FC<Props> = ({ doc }) => {
     if (related.length === 0) return;
     let cancelled = false;
 
-    Promise.all(related.map((relatedId) => getDocumentById(relatedId))).then((results) => {
-      if (!cancelled) setRecords(results.filter((r): r is Document => !!r));
+    Promise.allSettled(related.map((relatedId) => getDocumentById(relatedId))).then((results) => {
+      if (cancelled) return;
+      setRecords(
+        results
+          .filter((r): r is PromiseFulfilledResult<Document | null> => r.status === 'fulfilled')
+          .map((r) => r.value)
+          .filter((r): r is Document => !!r)
+      );
     });
 
     return () => {
@@ -64,12 +93,18 @@ export const DocumentRelated: React.FC<Props> = ({ doc }) => {
     setSortOrder(SortMode.ASC);
   };
 
+  // Records exist with no files at all, and the file endpoint 404s for them, so
+  // the download is hidden rather than offered and left to fail.
+  const primaryFile = (record: Document) => record.files?.find((f) => f.variant === 'large') ?? record.files?.[0];
+
   const handleDownload = async (record: Document) => {
-    const filename = record.files?.[0]?.filename ?? `${record.id}.jpg`;
+    const file = primaryFile(record);
+    if (!file) return;
+
     setDownloadError(null);
     setDownloading(record.id);
     try {
-      await downloadDocumentFile(record.id, filename, record.files?.[0]?.variant);
+      await downloadDocumentFile(record.id, file?.filename, file?.variant);
     } catch (e) {
       setDownloadError(e instanceof DownloadError ? e.message : 'Nedladdningen misslyckades.');
     } finally {
@@ -81,16 +116,17 @@ export const DocumentRelated: React.FC<Props> = ({ doc }) => {
 
   return (
     <div className="flex flex-col gap-16" data-cy="document-related">
+      <h2 className="text-h4-md">Relaterade dokument</h2>
       {downloadError && (
         <div role="alert" className="text-error" data-cy="related-download-error">
           {downloadError}
         </div>
       )}
 
-      <Table background>
+      <Table background className={TABLE_LAYOUT}>
         <Table.Header>
           {COLUMNS.map((column) => (
-            <Table.HeaderColumn key={column.key}>
+            <Table.HeaderColumn key={column.key} className={column.key === 'year' ? '!px-8' : undefined}>
               <Table.SortButton
                 isActive={sortKey === column.key}
                 sortOrder={sortKey === column.key ? sortOrder : null}
@@ -112,20 +148,22 @@ export const DocumentRelated: React.FC<Props> = ({ doc }) => {
                 <Label rounded>{DOCUMENT_TYPE_LABELS[record.type as DocumentType] ?? record.type}</Label>
               </Table.Column>
               <Table.Column>{record.title || '(Utan titel)'}</Table.Column>
-              <Table.Column>{record.year || '---'}</Table.Column>
+              <Table.Column className="!px-8">{record.year || '---'}</Table.Column>
               <Table.Column>{record.location || '---'}</Table.Column>
-              <Table.Column>
-                <div className="flex items-center justify-end gap-18">
-                  <Button
-                    size="sm"
-                    color="primary"
-                    rightIcon={<Download size={16} />}
-                    onClick={() => handleDownload(record)}
-                    loading={downloading === record.id}
-                    disabled={downloading !== null}
-                  >
-                    Ladda ned
-                  </Button>
+              <Table.Column className="justify-end">
+                <div className="flex flex-col items-end gap-8 whitespace-nowrap sm:flex-row sm:items-center sm:gap-18">
+                  {primaryFile(record) && (
+                    <ActionButton
+                      label="Ladda ned"
+                      accessibleLabel={`Ladda ned ${record.title || record.id}`}
+                      icon={<Download size={16} />}
+                      size="sm"
+                      color="primary"
+                      onClick={() => handleDownload(record)}
+                      loading={downloading === record.id}
+                      disabled={downloading !== null}
+                    />
+                  )}
                   <Button
                     iconButton
                     size="sm"
