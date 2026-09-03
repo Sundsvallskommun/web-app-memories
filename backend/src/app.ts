@@ -62,6 +62,7 @@ export class App {
       cors({
         credentials: CREDENTIALS === 'true',
         origin: NODE_ENV === 'development' ? true : ORIGIN,
+        exposedHeaders: ['Content-Disposition'],
       }),
     );
 
