@@ -16,8 +16,10 @@ const VARIANT_LABELS: Record<string, string> = {
 
 const variantLabel = (file: DocumentFile): string => VARIANT_LABELS[file.variant ?? ''] ?? 'Fil';
 
-const fileUrl = (docId: string, file: DocumentFile): string =>
-  apiURL(`documents/${docId}/file${file.variant ? `?variant=${file.variant}` : ''}`);
+const fileUrl = (docId: string, file: DocumentFile): string => {
+  const query = file.variant ? `?variant=${file.variant}` : '';
+  return apiURL(`documents/${docId}/file${query}`);
+};
 
 /**
  * Column layout, one rule per intent.
@@ -39,8 +41,8 @@ const TABLE_LAYOUT = [
   '[&_thead]:hidden md:[&_thead]:table-header-group',
 ].join(' ');
 
-const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.tif', '.tiff', '.webp'];
-const TEXT_EXTENSIONS = ['.xml', '.html', '.htm', '.txt'];
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.tif', '.tiff', '.webp']);
+const TEXT_EXTENSIONS = new Set(['.xml', '.html', '.htm', '.txt']);
 
 /**
  * How to preview a file, decided from its name rather than its variant: a
@@ -56,10 +58,34 @@ const previewKind = (file: DocumentFile): PreviewKind => {
   const dot = name.lastIndexOf('.');
   const extension = dot > 0 ? name.slice(dot) : '';
 
-  if (IMAGE_EXTENSIONS.includes(extension)) return 'image';
+  if (IMAGE_EXTENSIONS.has(extension)) return 'image';
   if (extension === '.pdf') return 'pdf';
-  if (TEXT_EXTENSIONS.includes(extension)) return 'text';
+  if (TEXT_EXTENSIONS.has(extension)) return 'text';
   return 'none';
+};
+
+const FilePreview: React.FC<{ docId: string; file: DocumentFile; title: string }> = ({ docId, file, title }) => {
+  const src = fileUrl(docId, file);
+
+  switch (previewKind(file)) {
+    case 'image':
+      return <img src={src} alt={title || file.filename} className="max-h-[70vh] max-w-full w-auto rounded-cards" />;
+    case 'pdf':
+      // No sandbox: it blocks the browser's built-in PDF viewer.
+      return <iframe src={src} title={file.filename} className="w-full h-[70vh] rounded-cards bg-white" />;
+    case 'text':
+      return (
+        <iframe
+          src={src}
+          title={file.filename}
+          sandbox="allow-same-origin"
+          className="w-full h-[70vh] rounded-cards bg-white"
+        />
+      );
+    default:
+      // Film and audio are downloads, not something the archive renders inline.
+      return <p className="text-center">Den här filen går inte att förhandsgranska. Ladda ned den i stället.</p>;
+  }
 };
 
 interface Props {
@@ -152,29 +178,7 @@ export const DocumentFiles: React.FC<Props> = ({ doc }) => {
       >
         {shown && (
           <div className="flex flex-col items-center gap-16" data-cy="file-modal">
-            {previewKind(shown) === 'image' ?
-              <img
-                src={fileUrl(doc.id, shown)}
-                alt={doc.title || shown.filename}
-                className="max-h-[70vh] max-w-full w-auto rounded-cards"
-              />
-            : previewKind(shown) === 'pdf' ?
-              // No sandbox: it blocks the browser's built-in PDF viewer.
-              <iframe
-                src={fileUrl(doc.id, shown)}
-                title={shown.filename}
-                className="w-full h-[70vh] rounded-cards bg-white"
-              />
-            : previewKind(shown) === 'text' ?
-              <iframe
-                src={fileUrl(doc.id, shown)}
-                title={shown.filename}
-                sandbox="allow-same-origin"
-                className="w-full h-[70vh] rounded-cards bg-white"
-              />
-              // Film and audio are downloads, not something the archive renders
-              // in a frame.
-            : <p className="text-center">Den här filen går inte att förhandsgranska. Ladda ned den i stället.</p>}
+            <FilePreview docId={doc.id} file={shown} title={doc.title} />
 
             <Button
               color="primary"

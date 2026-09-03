@@ -36,6 +36,15 @@ const imageVariants = (doc: Document): Variant[] => {
   return out;
 };
 
+const pdfVariantOf = (doc: Document): Variant | 'text' | undefined => {
+  if (isPdfFilename(findFile(doc, 'large')?.filename)) return 'large';
+
+  const carriesText = doc.type === 'Publication' || doc.type === 'Text';
+  if (carriesText && isPdfFilename(findFile(doc, 'text')?.filename)) return 'text';
+
+  return undefined;
+};
+
 interface Props {
   doc: Document;
 }
@@ -53,14 +62,8 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
 
   if (!isImageType(doc.type)) return null;
 
-  const largeFile = findFile(doc, 'large');
-  const textFile = doc.type === 'Publication' || doc.type === 'Text' ? findFile(doc, 'text') : undefined;
-  const largeIsPdf = isPdfFilename(largeFile?.filename);
-  const textIsPdf = isPdfFilename(textFile?.filename);
-  const pdfVariant: Variant | 'text' | undefined =
-    largeIsPdf ? 'large'
-    : textIsPdf ? 'text'
-    : undefined;
+  const largeIsPdf = isPdfFilename(findFile(doc, 'large')?.filename);
+  const pdfVariant = pdfVariantOf(doc);
   const showImage = !largeIsPdf && imageVariants(doc).length > 0;
 
   if (!pdfVariant && !showImage) return null;

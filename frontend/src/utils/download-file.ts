@@ -60,9 +60,19 @@ const saveAs = (filename: string | undefined, res: Response, docId: string): str
   return filename.slice(0, -ours.length) + theirs;
 };
 
+const failureMessage = (status: number, filename: string | undefined): string => {
+  const subject = filename ? `Filen "${filename}"` : 'Filen';
+
+  if (status === 404) {
+    return `${subject} saknas i arkivet. Det här är en känd lucka i digitaliseringen. Kontakta arkivet om du behöver originalet.`;
+  }
+
+  return `${subject} kunde inte hämtas (felkod ${status}).`;
+};
+
 export const downloadDocumentFile = async (docId: string, filename?: string, variant?: string): Promise<void> => {
-  const url = apiURL(`documents/${docId}/file${variant ? `?variant=${variant}` : ''}`);
-  const label = filename ? `"${filename}"` : 'filen';
+  const query = variant ? `?variant=${variant}` : '';
+  const url = apiURL(`documents/${docId}/file${query}`);
 
   let res: Response;
   try {
@@ -72,12 +82,7 @@ export const downloadDocumentFile = async (docId: string, filename?: string, var
   }
 
   if (!res.ok) {
-    throw new DownloadError(
-      res.status === 404 ?
-        `${filename ? `Filen ${label}` : 'Filen'} saknas i arkivet. Det här är en känd lucka i digitaliseringen. Kontakta arkivet om du behöver originalet.`
-      : `Kunde inte hämta ${label} (felkod ${res.status}).`,
-      res.status
-    );
+    throw new DownloadError(failureMessage(res.status, filename), res.status);
   }
 
   const blobUrl = URL.createObjectURL(await res.blob());
@@ -86,6 +91,6 @@ export const downloadDocumentFile = async (docId: string, filename?: string, var
   link.download = saveAs(filename, res, docId);
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+  link.remove();
   URL.revokeObjectURL(blobUrl);
 };
