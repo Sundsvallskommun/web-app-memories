@@ -69,6 +69,7 @@ export interface SearchParams {
   types?: DocumentType[];
   yearFrom?: number;
   yearTo?: number;
+  location?: string;
   // Constrained to the fields the combined search can sort on.
   sortBy?: 'year' | 'title' | 'objectType';
   sortDirection?: 'asc' | 'desc';

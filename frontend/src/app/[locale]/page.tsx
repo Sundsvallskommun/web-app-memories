@@ -10,6 +10,7 @@ import { DOCUMENT_TYPE_LABELS, DocumentType, SearchParams, SearchResult } from '
 import { DocumentCard } from '@components/document-card/document-card.component';
 import { DocumentCardSkeleton } from '@components/document-card/document-card-skeleton.component';
 import { PeriodFilter } from '@components/search-filters/period-filter.component';
+import { TextFilter } from '@components/search-filters/text-filter.component';
 import { TypeFilter } from '@components/search-filters/type-filter.component';
 import { searchDocuments } from '@services/document-service';
 
@@ -107,6 +108,7 @@ const SearchPage: React.FC = () => {
   const pageSize = parseSize(searchParams.get('size'));
   const yearFrom = parseYear(searchParams.get('from'));
   const yearTo = parseYear(searchParams.get('to'));
+  const location = searchParams.get('location')?.trim() || undefined;
 
   // The only piece of local state: what's currently typed in the search input.
   // We don't commit this to the URL on every keystroke (that would hammer the
@@ -141,7 +143,8 @@ const SearchPage: React.FC = () => {
           'size' in patch ||
           'q' in patch ||
           'from' in patch ||
-          'to' in patch)
+          'to' in patch ||
+          'location' in patch)
       ) {
         next.delete('page');
       }
@@ -153,8 +156,8 @@ const SearchPage: React.FC = () => {
 
   // Single searcher: fires whenever any URL-backed state changes.
   const searchKey = useMemo(
-    () => JSON.stringify({ query, selectedTypes, yearFrom, yearTo, sortBy, sortDirection, page, pageSize }),
-    [query, selectedTypes, yearFrom, yearTo, sortBy, sortDirection, page, pageSize]
+    () => JSON.stringify({ query, selectedTypes, yearFrom, yearTo, location, sortBy, sortDirection, page, pageSize }),
+    [query, selectedTypes, yearFrom, yearTo, location, sortBy, sortDirection, page, pageSize]
   );
 
   useEffect(() => {
@@ -164,6 +167,7 @@ const SearchPage: React.FC = () => {
       types: selectedTypes,
       yearFrom,
       yearTo,
+      location,
       sortBy,
       sortDirection,
       page,
@@ -237,8 +241,12 @@ const SearchPage: React.FC = () => {
   for (const type of selectedTypes) {
     activeFilters.push({ label: DOCUMENT_TYPE_LABELS[type], clear: () => handleTypeToggle(type) });
   }
+  if (location) {
+    activeFilters.push({ label: location, clear: () => updateParams({ location: undefined }) });
+  }
 
-  const clearAllFilters = () => updateParams({ from: undefined, to: undefined, type: undefined });
+  const clearAllFilters = () =>
+    updateParams({ from: undefined, to: undefined, type: undefined, location: undefined });
 
   const getTypeCount = (type: DocumentType): number => {
     if (!result) return 0;
@@ -282,6 +290,15 @@ const SearchPage: React.FC = () => {
                   countFor={getTypeCount}
                   onToggle={handleTypeToggle}
                   onClear={() => updateParams({ type: undefined })}
+                />
+                <TextFilter
+                  label="Plats"
+                  fieldLabel="Plats"
+                  placeholder="Skriv en plats"
+                  applyLabel="Visa plats"
+                  value={location}
+                  onApply={(next) => updateParams({ location: next })}
+                  data-cy="place-filter"
                 />
               </div>
             </div>
