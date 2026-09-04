@@ -114,11 +114,16 @@ export class DocumentController {
     if (location?.trim()) params.set('location', location.trim());
     if (creator?.trim()) params.set('creator', creator.trim());
 
-    // Restrict to the requested type, or to the document types when none is
-    // given. Registers hold about 174k of the 205k records, so without this a
-    // plain search would return mostly persons and seamen.
-    const requestedObjectType = type ? DOCUMENT_TYPE_TO_OBJECT_TYPE[type] : undefined;
-    for (const objectType of requestedObjectType ? [requestedObjectType] : DOCUMENT_OBJECT_TYPES) {
+    const requestedObjectTypes = [
+      ...new Set(
+        (type ?? '')
+          .split(',')
+          .map(name => DOCUMENT_TYPE_TO_OBJECT_TYPE[name.trim()])
+          .filter(Boolean),
+      ),
+    ];
+
+    for (const objectType of requestedObjectTypes.length > 0 ? requestedObjectTypes : DOCUMENT_OBJECT_TYPES) {
       params.append('objectType', objectType);
     }
 
