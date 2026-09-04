@@ -25,7 +25,9 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
     pageSize: String(pageSize),
   };
   if (params.query) queryParams.query = params.query;
-  if (params.type) queryParams.type = params.type;
+  if (params.types?.length) queryParams.type = params.types.join(`,`);
+  if (params.yearFrom) queryParams.yearFrom = String(params.yearFrom);
+  if (params.yearTo) queryParams.yearTo = String(params.yearTo);
   if (params.sortBy) queryParams.sortBy = params.sortBy;
   if (params.sortDirection) queryParams.sortDirection = params.sortDirection;
 

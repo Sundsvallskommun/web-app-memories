@@ -66,7 +66,9 @@ export interface Document {
 
 export interface SearchParams {
   query?: string;
-  type?: DocumentType;
+  types?: DocumentType[];
+  yearFrom?: number;
+  yearTo?: number;
   // Constrained to the fields the combined search can sort on.
   sortBy?: 'year' | 'title' | 'objectType';
   sortDirection?: 'asc' | 'desc';

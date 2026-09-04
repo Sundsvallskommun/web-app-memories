@@ -5,10 +5,12 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import DefaultLayout from '@layouts/default-layout/default-layout.component';
 import Main from '@layouts/main/main.component';
 import { Alert, SearchField, Button, Pagination, Select, Chip, PopupMenu, Filter } from '@sk-web-gui/react';
-import { ChevronDown, Search, X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, DocumentType, SearchParams, SearchResult } from '@data-contracts/document';
 import { DocumentCard } from '@components/document-card/document-card.component';
 import { DocumentCardSkeleton } from '@components/document-card/document-card-skeleton.component';
+import { PeriodFilter } from '@components/search-filters/period-filter.component';
+import { TypeFilter } from '@components/search-filters/type-filter.component';
 import { searchDocuments } from '@services/document-service';
 
 const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
@@ -47,8 +49,14 @@ const DEFAULT_PAGE_SIZE = 12;
 // looking at, page reloads keep the filter, and filtered URLs are shareable.
 // ---------------------------------------------------------------------------
 
-const parseType = (raw: string | null): DocumentType | undefined =>
-  raw && (TYPES as readonly string[]).includes(raw) ? (raw as DocumentType) : undefined;
+const parseTypes = (raw: string | null): DocumentType[] => [
+  ...new Set(
+    (raw ?? '')
+      .split(',')
+      .map((name) => name.trim())
+      .filter((name): name is DocumentType => (TYPES as readonly string[]).includes(name))
+  ),
+];
 
 const parseSortBy = (raw: string | null): SortBy | undefined =>
   raw && (SORT_KEYS as readonly string[]).includes(raw) ? (raw as SortBy) : undefined;
@@ -66,6 +74,24 @@ const parseSize = (raw: string | null): number => {
   return PAGE_SIZE_OPTIONS.includes(n) ? n : DEFAULT_PAGE_SIZE;
 };
 
+// There are records dated 22 and 3000, which are clearly erroneous.
+// The corrupted years are filtered out by the bounds below.
+const MIN_YEAR = 1000;
+const MAX_YEAR = new Date().getFullYear();
+
+const parseYear = (raw: string | null): number | undefined => {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= MIN_YEAR && n <= MAX_YEAR ? n : undefined;
+};
+
+// Chip text
+const periodLabelFor = (yearFrom?: number, yearTo?: number): string | undefined => {
+  if (yearFrom && yearTo) return `${yearFrom} - ${yearTo}`;
+  if (yearFrom) return `Från ${yearFrom}`;
+  if (yearTo) return `Till ${yearTo}`;
+  return undefined;
+};
+
 const SearchPage: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
@@ -74,11 +100,13 @@ const SearchPage: React.FC = () => {
   // Derive current search state from the URL on every render. No useState for
   // these — the URL is the single source of truth.
   const query = searchParams.get('q') ?? '';
-  const selectedType = parseType(searchParams.get('type'));
+  const selectedTypes = parseTypes(searchParams.get('type'));
   const sortBy = parseSortBy(searchParams.get('sort'));
   const sortDirection = parseSortDir(searchParams.get('dir'));
   const page = parsePage(searchParams.get('page'));
   const pageSize = parseSize(searchParams.get('size'));
+  const yearFrom = parseYear(searchParams.get('from'));
+  const yearTo = parseYear(searchParams.get('to'));
 
   // The only piece of local state: what's currently typed in the search input.
   // We don't commit this to the URL on every keystroke (that would hammer the
@@ -107,7 +135,13 @@ const SearchPage: React.FC = () => {
       // meaningful across different result sets.
       if (
         !('page' in patch) &&
-        ('type' in patch || 'sort' in patch || 'dir' in patch || 'size' in patch || 'q' in patch)
+        ('type' in patch ||
+          'sort' in patch ||
+          'dir' in patch ||
+          'size' in patch ||
+          'q' in patch ||
+          'from' in patch ||
+          'to' in patch)
       ) {
         next.delete('page');
       }
@@ -119,15 +153,17 @@ const SearchPage: React.FC = () => {
 
   // Single searcher: fires whenever any URL-backed state changes.
   const searchKey = useMemo(
-    () => JSON.stringify({ query, selectedType, sortBy, sortDirection, page, pageSize }),
-    [query, selectedType, sortBy, sortDirection, page, pageSize]
+    () => JSON.stringify({ query, selectedTypes, yearFrom, yearTo, sortBy, sortDirection, page, pageSize }),
+    [query, selectedTypes, yearFrom, yearTo, sortBy, sortDirection, page, pageSize]
   );
 
   useEffect(() => {
     let cancelled = false;
     const params: SearchParams = {
       query: query || undefined,
-      type: selectedType,
+      types: selectedTypes,
+      yearFrom,
+      yearTo,
       sortBy,
       sortDirection,
       page,
@@ -155,8 +191,9 @@ const SearchPage: React.FC = () => {
     updateParams({ q: trimmed || undefined });
   };
 
-  const handleTypeClick = (type: DocumentType) => {
-    updateParams({ type: selectedType === type ? undefined : type });
+  const handleTypeToggle = (type: DocumentType) => {
+    const next = selectedTypes.includes(type) ? selectedTypes.filter((t) => t !== type) : [...selectedTypes, type];
+    updateParams({ type: next.length > 0 ? next.join(',') : undefined });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -179,6 +216,10 @@ const SearchPage: React.FC = () => {
       SORT_OPTIONS.find((o) => o.sortBy === sortBy && o.sortDirection === sortDirection)?.value
     : undefined;
 
+  const handlePeriodApply = (from?: number, to?: number) => {
+    updateParams({ from: from ? String(from) : undefined, to: to ? String(to) : undefined });
+  };
+
   const handlePageSizeChange = (next: number) => {
     updateParams({ size: next === DEFAULT_PAGE_SIZE ? undefined : String(next) });
   };
@@ -186,6 +227,18 @@ const SearchPage: React.FC = () => {
   const totalPages = result?.totalPages ?? 0;
   const rangeStart = result && result.documents.length > 0 ? (result.page - 1) * result.pageSize + 1 : 0;
   const rangeEnd = result ? rangeStart + result.documents.length - 1 : 0;
+
+  const periodLabel = periodLabelFor(yearFrom, yearTo);
+
+  const activeFilters: { label: string; clear: () => void }[] = [];
+  if (periodLabel) {
+    activeFilters.push({ label: periodLabel, clear: () => updateParams({ from: undefined, to: undefined }) });
+  }
+  for (const type of selectedTypes) {
+    activeFilters.push({ label: DOCUMENT_TYPE_LABELS[type], clear: () => handleTypeToggle(type) });
+  }
+
+  const clearAllFilters = () => updateParams({ from: undefined, to: undefined, type: undefined });
 
   const getTypeCount = (type: DocumentType): number => {
     if (!result) return 0;
@@ -201,65 +254,51 @@ const SearchPage: React.FC = () => {
   return (
     <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
       <Main>
-        <div className="flex flex-col gap-lg">
-          {/* Search field */}
-          <div>
-            <h1 className="text-h2-sm md:text-h2-md mb-md">Sök i Sundsvallsminnen</h1>
-            <p className="text-body mb-lg">
-              Sök bland filmer, publikationer, fotografier, föremål, ljud och texter i Sundsvalls arkiv.
-            </p>
+        <div className="flex flex-col gap-md">
+          <h1 className="sr-only">Sök i Sundsvallsminnen</h1>
 
-            <div className="flex gap-sm items-end">
-              <div className="flex-grow">
-                <SearchField
-                  value={queryDraft}
-                  onChange={(e) => setQueryDraft(e.target.value)}
-                  onSearch={handleSearch}
-                  onReset={() => {
-                    setQueryDraft('');
-                    updateParams({ q: undefined });
-                  }}
-                  placeholder="Sök i arkivet..."
-                  aria-label="Sökfält"
+          <div className="flex flex-wrap items-center gap-4 rounded-cards bg-background-200 px-16 py-12">
+            <div className="w-[496px]">
+              <SearchField
+                className="w-full"
+                value={queryDraft}
+                onChange={(e) => setQueryDraft(e.target.value)}
+                onSearch={handleSearch}
+                onReset={() => {
+                  setQueryDraft('');
+                  updateParams({ q: undefined });
+                }}
+                placeholder="Fritext sök"
+                aria-label="Sökfält"
+              />
+            </div>
+
+            <div className="flex gap-[255px]">
+              <div className="flex gap-4">
+                <PeriodFilter yearFrom={yearFrom} yearTo={yearTo} onApply={handlePeriodApply} />
+                <TypeFilter
+                  types={TYPES}
+                  selected={selectedTypes}
+                  countFor={getTypeCount}
+                  onToggle={handleTypeToggle}
+                  onClear={() => updateParams({ type: undefined })}
                 />
               </div>
-              <Button color="vattjom" onClick={handleSearch} leftIcon={<Search size={18} />}>
-                Sök
-              </Button>
             </div>
           </div>
 
-          {/* Type filter chips */}
-          <div className="flex flex-wrap gap-xs items-center">
-            <span className="text-label-small mr-sm">Källtyp:</span>
-            {TYPES.map((type) => {
-              const count = getTypeCount(type);
-              const isSelected = selectedType === type;
-              return (
-                <Chip
-                  key={type}
-                  onClick={() => handleTypeClick(type)}
-                  strong={isSelected}
-                  inverted={isSelected}
-                  aria-pressed={isSelected}
-                >
-                  {DOCUMENT_TYPE_LABELS[type]} ({count})
+          {activeFilters.length > 0 && (
+            <div className="flex flex-wrap items-center gap-8" data-cy="active-filters">
+              {activeFilters.map((filter) => (
+                <Chip key={filter.label} onClick={filter.clear}>
+                  {filter.label}
                 </Chip>
-              );
-            })}
-            {selectedType && (
-              <Button
-                variant="tertiary"
-                size="sm"
-                onClick={() => updateParams({ type: undefined })}
-                leftIcon={<X size={14} />}
-              >
-                Visa alla
+              ))}
+              <Button variant="tertiary" size="sm" onClick={clearAllFilters}>
+                Rensa alla
               </Button>
-            )}
-          </div>
-
-          <hr className="border-divider" />
+            </div>
+          )}
 
           {/* Results section */}
           <div>
