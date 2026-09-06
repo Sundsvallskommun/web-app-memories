@@ -6,7 +6,8 @@ import { ChevronDown } from 'lucide-react';
 
 interface Props {
   label: string;
-  fieldLabel: string;
+  /** Optional: omit when it would only repeat the dropdown label. */
+  fieldLabel?: string;
   placeholder: string;
   applyLabel: string;
   value?: string;
@@ -41,12 +42,15 @@ export const TextFilter: React.FC<Props> = ({
         <PopupMenu.Panel className="p-16 w-max">
           <div className="flex flex-col gap-8 w-full">
             <FormControl className="w-full">
-              <FormLabel>{fieldLabel}</FormLabel>
+              {fieldLabel && <FormLabel>{fieldLabel}</FormLabel>}
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && apply()}
                 placeholder={placeholder}
+                // Without a visible label the field still needs a name, and the
+                // dropdown's own label is the one the user just clicked.
+                aria-label={fieldLabel ? undefined : label}
                 data-cy={dataCy ? `${dataCy}-input` : undefined}
               />
             </FormControl>

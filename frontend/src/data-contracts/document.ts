@@ -70,6 +70,8 @@ export interface SearchParams {
   yearFrom?: number;
   yearTo?: number;
   location?: string;
+  /** Free-text originator, matching both persons and organisations. */
+  creator?: string;
   // Constrained to the fields the combined search can sort on.
   sortBy?: 'year' | 'title' | 'objectType';
   sortDirection?: 'asc' | 'desc';

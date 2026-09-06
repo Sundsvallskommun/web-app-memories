@@ -29,6 +29,7 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
   if (params.yearFrom) queryParams.yearFrom = String(params.yearFrom);
   if (params.yearTo) queryParams.yearTo = String(params.yearTo);
   if (params.location) queryParams.location = params.location;
+  if (params.creator) queryParams.creator = params.creator;
   if (params.sortBy) queryParams.sortBy = params.sortBy;
   if (params.sortDirection) queryParams.sortDirection = params.sortDirection;
 

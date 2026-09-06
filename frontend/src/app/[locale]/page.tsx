@@ -109,6 +109,7 @@ const SearchPage: React.FC = () => {
   const yearFrom = parseYear(searchParams.get('from'));
   const yearTo = parseYear(searchParams.get('to'));
   const location = searchParams.get('location')?.trim() || undefined;
+  const creator = searchParams.get('creator')?.trim() || undefined;
 
   // The only piece of local state: what's currently typed in the search input.
   // We don't commit this to the URL on every keystroke (that would hammer the
@@ -144,7 +145,8 @@ const SearchPage: React.FC = () => {
           'q' in patch ||
           'from' in patch ||
           'to' in patch ||
-          'location' in patch)
+          'location' in patch ||
+          'creator' in patch)
       ) {
         next.delete('page');
       }
@@ -156,8 +158,8 @@ const SearchPage: React.FC = () => {
 
   // Single searcher: fires whenever any URL-backed state changes.
   const searchKey = useMemo(
-    () => JSON.stringify({ query, selectedTypes, yearFrom, yearTo, location, sortBy, sortDirection, page, pageSize }),
-    [query, selectedTypes, yearFrom, yearTo, location, sortBy, sortDirection, page, pageSize]
+    () => JSON.stringify({ query, selectedTypes, yearFrom, yearTo, location, creator, sortBy, sortDirection, page, pageSize }),
+    [query, selectedTypes, yearFrom, yearTo, location, creator, sortBy, sortDirection, page, pageSize]
   );
 
   useEffect(() => {
@@ -168,6 +170,7 @@ const SearchPage: React.FC = () => {
       yearFrom,
       yearTo,
       location,
+      creator,
       sortBy,
       sortDirection,
       page,
@@ -244,9 +247,12 @@ const SearchPage: React.FC = () => {
   if (location) {
     activeFilters.push({ label: location, clear: () => updateParams({ location: undefined }) });
   }
+  if (creator) {
+    activeFilters.push({ label: creator, clear: () => updateParams({ creator: undefined }) });
+  }
 
   const clearAllFilters = () =>
-    updateParams({ from: undefined, to: undefined, type: undefined, location: undefined });
+    updateParams({ from: undefined, to: undefined, type: undefined, location: undefined, creator: undefined });
 
   const getTypeCount = (type: DocumentType): number => {
     if (!result) return 0;
@@ -293,12 +299,19 @@ const SearchPage: React.FC = () => {
                 />
                 <TextFilter
                   label="Plats"
-                  fieldLabel="Plats"
                   placeholder="Skriv en plats"
                   applyLabel="Visa plats"
                   value={location}
                   onApply={(next) => updateParams({ location: next })}
                   data-cy="place-filter"
+                />
+                <TextFilter
+                  label="Upphovsperson"
+                  placeholder="Skriv ett namn"
+                  applyLabel="Visa upphovsperson"
+                  value={creator}
+                  onApply={(next) => updateParams({ creator: next })}
+                  data-cy="creator-filter"
                 />
               </div>
             </div>
