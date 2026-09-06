@@ -506,10 +506,38 @@ const OBJECT_TYPE_TO_DOCUMENT_TYPE: Record<string, string> = {
   Person: 'Person',
   'Juridisk person': 'LegalEntity',
   Sjöman: 'Seaman',
+  Mantal: 'Census',
 };
 
 /** The six types that carry documents. The registers are searchable but are not documents. */
 export const DOCUMENT_OBJECT_TYPES = ['Foto', 'Föremål', 'Film', 'Ljud', 'Text', 'Publikation'];
+
+export interface CensusRecord {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  gender: string | null;
+  /** A full date despite the name, for example "1898-06-24". */
+  birthYear: string | null;
+  note: string | null;
+  objectNumber: string | null;
+  source: string | null;
+  farmNumber: string | null;
+  householdNumber: string | null;
+  occupationRelation: string | null;
+}
+
+export const mapCensusRecordToDocument = (record: CensusRecord): Document => ({
+  id: `mantal-${record.id}`,
+  title: [record.firstName, record.lastName].filter(Boolean).join(' '),
+  type: 'Census',
+  year: parseYear(record.birthYear),
+  location: '',
+  creator: '',
+  description: [record.occupationRelation, record.note].filter(Boolean).join(' — '),
+  accnr: opt(record.objectNumber),
+  source: opt(record.source),
+});
 
 /**
  * `/objects` and `/documents/:id` disagree on two prefixes: upstream says

@@ -6,6 +6,7 @@ import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
 import {
   Audio,
+  CensusRecord,
   CombinedObjectResponse,
   DOCUMENT_OBJECT_TYPES,
   Film,
@@ -14,6 +15,7 @@ import {
   Text,
   TypeCount,
   mapAudioToDocument,
+  mapCensusRecordToDocument,
   mapCombinedObjectsToDocuments,
   mapFilmToDocument,
   mapPhotoToDocument,
@@ -62,6 +64,7 @@ const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
   Person: 'Person',
   Seaman: 'Sjöman',
   LegalEntity: 'Juridisk person',
+  Census: 'Mantal',
 };
 
 const countFor = (typeCounts: TypeCount[] | undefined, objectType: string): number =>
@@ -186,10 +189,16 @@ export class DocumentController {
       return response.send({ data: mapTextToDocument(res.data), message: 'success' });
     }
 
-    // Register records (person-, jurpers-, sjoman-) are searchable through
-    // /objects but have no document representation, so there is nothing to
-    // render. Answer 404 rather than falling through to the film branch, which
-    // would report the id as malformed.
+    if (id.startsWith('mantal-')) {
+      const censusId = id.slice('mantal-'.length);
+      if (!/^\d{4}-\d+$/.test(censusId)) throw new HttpException(400, `Invalid document id: ${id}`);
+
+      const res = await this.apiService.get<CensusRecord>({
+        url: `${base}/${MUNICIPALITY_ID}/census-records/${censusId}`,
+      });
+      return response.send({ data: mapCensusRecordToDocument(res.data), message: 'success' });
+    }
+
     if (/^[a-z]+-/.test(id) && !id.startsWith('film-')) {
       throw new HttpException(404, 'Not found');
     }
