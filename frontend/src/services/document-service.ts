@@ -11,6 +11,9 @@ interface ApiResponse {
   objectTotal: number;
   audioTotal: number;
   textTotal: number;
+  personTotal: number;
+  censusTotal: number;
+  seamanTotal: number;
   page: number;
   pageSize: number;
   message: string;
@@ -30,6 +33,7 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
   if (params.yearTo) queryParams.yearTo = String(params.yearTo);
   if (params.location) queryParams.location = params.location;
   if (params.creator) queryParams.creator = params.creator;
+  if (params.gender) queryParams.gender = params.gender;
   if (params.sortBy) queryParams.sortBy = params.sortBy;
   if (params.sortDirection) queryParams.sortDirection = params.sortDirection;
 
@@ -48,6 +52,9 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
     objectTotal: data?.objectTotal || 0,
     audioTotal: data?.audioTotal || 0,
     textTotal: data?.textTotal || 0,
+    personTotal: data?.personTotal || 0,
+    censusTotal: data?.censusTotal || 0,
+    seamanTotal: data?.seamanTotal || 0,
   };
 };
 

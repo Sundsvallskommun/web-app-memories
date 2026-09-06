@@ -10,11 +10,19 @@ import { DOCUMENT_TYPE_LABELS, DocumentType, SearchParams, SearchResult } from '
 import { DocumentCard } from '@components/document-card/document-card.component';
 import { DocumentCardSkeleton } from '@components/document-card/document-card-skeleton.component';
 import { PeriodFilter } from '@components/search-filters/period-filter.component';
+import { PersonFilter, GENDERS } from '@components/search-filters/person-filter.component';
 import { TextFilter } from '@components/search-filters/text-filter.component';
 import { TypeFilter } from '@components/search-filters/type-filter.component';
 import { searchDocuments } from '@services/document-service';
 
 const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
+// Registers of people and organisations. Searchable, but not documents, so they
+// only appear when picked rather than in an unfiltered search.
+const REGISTERS: DocumentType[] = ['Person', 'Census', 'Seaman'];
+// Sjöman is missing on purpose: the source has no gender column for seamen, so
+// any gender filter excludes all 116 094 of them.
+const GENDERED_REGISTERS: DocumentType[] = ['Person', 'Census'];
+const ALL_TYPES: DocumentType[] = [...TYPES, ...REGISTERS];
 
 const GRID_CLASS = 'flex flex-wrap list-none p-0 gap-24';
 const GRID_ITEM_CLASS = 'flex w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[calc(25%-18px)]';
@@ -55,7 +63,7 @@ const parseTypes = (raw: string | null): DocumentType[] => [
     (raw ?? '')
       .split(',')
       .map((name) => name.trim())
-      .filter((name): name is DocumentType => (TYPES as readonly string[]).includes(name))
+      .filter((name): name is DocumentType => (ALL_TYPES as readonly string[]).includes(name))
   ),
 ];
 
@@ -110,6 +118,8 @@ const SearchPage: React.FC = () => {
   const yearTo = parseYear(searchParams.get('to'));
   const location = searchParams.get('location')?.trim() || undefined;
   const creator = searchParams.get('creator')?.trim() || undefined;
+  const genderParam = searchParams.get('gender')?.trim();
+  const gender = genderParam && GENDERS.includes(genderParam) ? genderParam : undefined;
 
   // The only piece of local state: what's currently typed in the search input.
   // We don't commit this to the URL on every keystroke (that would hammer the
@@ -146,7 +156,8 @@ const SearchPage: React.FC = () => {
           'from' in patch ||
           'to' in patch ||
           'location' in patch ||
-          'creator' in patch)
+          'creator' in patch ||
+          'gender' in patch)
       ) {
         next.delete('page');
       }
@@ -157,9 +168,33 @@ const SearchPage: React.FC = () => {
   );
 
   // Single searcher: fires whenever any URL-backed state changes.
+  // A gender on its own does not describe a search: only Person and Mantal
+  // record one, so the BFF falls back to those two. Write that into the URL so
+  // the panel, the chips and the results cannot disagree, however the page was
+  // reached: a shared link, the back button, or a hand-edited address.
+  const supportsGender = selectedTypes.length > 0 && selectedTypes.every((type) => GENDERED_REGISTERS.includes(type));
+  useEffect(() => {
+    if (gender && !supportsGender) {
+      updateParams({ type: GENDERED_REGISTERS.join(',') });
+    }
+  }, [gender, supportsGender]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const searchKey = useMemo(
-    () => JSON.stringify({ query, selectedTypes, yearFrom, yearTo, location, creator, sortBy, sortDirection, page, pageSize }),
-    [query, selectedTypes, yearFrom, yearTo, location, creator, sortBy, sortDirection, page, pageSize]
+    () =>
+      JSON.stringify({
+        query,
+        selectedTypes,
+        yearFrom,
+        yearTo,
+        location,
+        creator,
+        gender,
+        sortBy,
+        sortDirection,
+        page,
+        pageSize,
+      }),
+    [query, selectedTypes, yearFrom, yearTo, location, creator, gender, sortBy, sortDirection, page, pageSize]
   );
 
   useEffect(() => {
@@ -171,6 +206,7 @@ const SearchPage: React.FC = () => {
       yearTo,
       location,
       creator,
+      gender,
       sortBy,
       sortDirection,
       page,
@@ -200,7 +236,49 @@ const SearchPage: React.FC = () => {
 
   const handleTypeToggle = (type: DocumentType) => {
     const next = selectedTypes.includes(type) ? selectedTypes.filter((t) => t !== type) : [...selectedTypes, type];
-    updateParams({ type: next.length > 0 ? next.join(',') : undefined });
+    updateParams({ type: next.length > 0 ? next.join(',') : undefined, ...clearedGenderIfUnsupported(next) });
+  };
+
+  // Ticks all three registers at once, or clears them when they are all on.
+  // Document types already selected are left alone, since the two dropdowns
+  // write to the same parameter.
+  const handleAllRegisters = () => {
+    const documentTypes = selectedTypes.filter((type) => !REGISTERS.includes(type));
+    const allOn = REGISTERS.every((type) => selectedTypes.includes(type));
+    const next = allOn ? documentTypes : [...documentTypes, ...REGISTERS];
+    updateParams({ type: next.length > 0 ? next.join(',') : undefined, ...clearedGenderIfUnsupported(next) });
+  };
+
+  // Gender is one flat condition upstream, applied to the whole query rather than
+  // to the person part of it. Anything without the column fails it, so a gender
+  // alongside Foto returns no photos at all, and alongside Sjöman returns
+  // nothing whatsoever.
+  //
+  // Rather than let the panel promise what the search cannot deliver, the two
+  // are kept consistent in both directions: a gender narrows the selection to
+  // the registers that record one, and choosing anything else drops the gender.
+  // Ask Linus whether gender can ignore records without the column instead, and
+  // this restriction can go.
+
+  /** A gender only holds while every selected type can carry one. */
+  const supportsGenderFor = (types: DocumentType[]) =>
+    types.length > 0 && types.every((type) => GENDERED_REGISTERS.includes(type));
+
+  /** Drop the gender as soon as the selection stops supporting it. */
+  const clearedGenderIfUnsupported = (types: DocumentType[]) =>
+    gender && !supportsGenderFor(types) ? { gender: undefined } : {};
+
+  const handleGenderChange = (next?: string) => {
+    if (!next) {
+      updateParams({ gender: undefined });
+      return;
+    }
+
+    // Keep only what can carry a gender, defaulting to both registers when the
+    // user had picked neither.
+    const kept = selectedTypes.filter((type) => GENDERED_REGISTERS.includes(type));
+    const types = kept.length > 0 ? kept : GENDERED_REGISTERS;
+    updateParams({ gender: next, type: types.join(',') });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -250,9 +328,19 @@ const SearchPage: React.FC = () => {
   if (creator) {
     activeFilters.push({ label: creator, clear: () => updateParams({ creator: undefined }) });
   }
+  if (gender) {
+    activeFilters.push({ label: gender, clear: () => updateParams({ gender: undefined }) });
+  }
 
   const clearAllFilters = () =>
-    updateParams({ from: undefined, to: undefined, type: undefined, location: undefined, creator: undefined });
+    updateParams({
+      from: undefined,
+      to: undefined,
+      type: undefined,
+      location: undefined,
+      creator: undefined,
+      gender: undefined,
+    });
 
   const getTypeCount = (type: DocumentType): number => {
     if (!result) return 0;
@@ -262,6 +350,9 @@ const SearchPage: React.FC = () => {
     if (type === 'Object') return result.objectTotal;
     if (type === 'Audio') return result.audioTotal;
     if (type === 'Text') return result.textTotal;
+    if (type === 'Person') return result.personTotal;
+    if (type === 'Census') return result.censusTotal;
+    if (type === 'Seaman') return result.seamanTotal;
     return 0;
   };
 
@@ -312,6 +403,15 @@ const SearchPage: React.FC = () => {
                   value={creator}
                   onApply={(next) => updateParams({ creator: next })}
                   data-cy="creator-filter"
+                />
+                <PersonFilter
+                  registers={REGISTERS}
+                  selectedRegisters={selectedTypes.filter((t) => REGISTERS.includes(t))}
+                  countFor={getTypeCount}
+                  onToggleRegister={handleTypeToggle}
+                  gender={gender}
+                  onGenderChange={handleGenderChange}
+                  onToggleAllRegisters={handleAllRegisters}
                 />
               </div>
             </div>

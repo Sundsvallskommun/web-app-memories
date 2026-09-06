@@ -1,4 +1,5 @@
-export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object' | 'Audio' | 'Text';
+/** The six types that carry documents, plus the registers, which are searchable too. */
+export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object' | 'Audio' | 'Text' | 'Person' | 'Census' | 'Seaman';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Film: 'Film',
@@ -7,6 +8,9 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Object: 'Föremål',
   Audio: 'Ljud',
   Text: 'Text',
+  Person: 'Person',
+  Census: 'Mantal',
+  Seaman: 'Sjöman',
 };
 
 export interface DocumentFile {
@@ -72,6 +76,8 @@ export interface SearchParams {
   location?: string;
   /** Free-text originator, matching both persons and organisations. */
   creator?: string;
+  /** One of Man, Kvinna or Okänt. Only the person registers record one. */
+  gender?: string;
   // Constrained to the fields the combined search can sort on.
   sortBy?: 'year' | 'title' | 'objectType';
   sortDirection?: 'asc' | 'desc';
@@ -91,4 +97,7 @@ export interface SearchResult {
   objectTotal: number;
   audioTotal: number;
   textTotal: number;
+  personTotal: number;
+  censusTotal: number;
+  seamanTotal: number;
 }
