@@ -67,6 +67,13 @@ const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
   Census: 'Mantal',
 };
 
+/**
+ * The registers that carry a gender. Sjöman is deliberately absent: the source
+ * has no such column for seamen, so a gender filter silently drops all 116 094
+ * of them however it is applied.
+ */
+const GENDERED_OBJECT_TYPES = ['Person', 'Mantal'];
+
 const countFor = (typeCounts: TypeCount[] | undefined, objectType: string): number =>
   typeCounts?.find(c => c.objectType === objectType)?.count ?? 0;
 
@@ -96,6 +103,7 @@ export class DocumentController {
     @QueryParam('yearTo') yearTo: number,
     @QueryParam('location') location: string,
     @QueryParam('creator') creator: string,
+    @QueryParam('gender') gender: string,
     @Res() response: Response,
   ) {
     const safePageSize = Math.max(1, pageSize);
@@ -116,6 +124,9 @@ export class DocumentController {
     if (yearTo) params.set('yearTo', String(yearTo));
     if (location?.trim()) params.set('location', location.trim());
     if (creator?.trim()) params.set('creator', creator.trim());
+    // Only the person registers record a gender, so this also excludes every
+    // document type and all 116k seamen, who have no such column upstream.
+    if (gender?.trim()) params.set('gender', gender.trim());
 
     const requestedObjectTypes = [
       ...new Set(
@@ -126,7 +137,11 @@ export class DocumentController {
       ),
     ];
 
-    for (const objectType of requestedObjectTypes.length > 0 ? requestedObjectTypes : DOCUMENT_OBJECT_TYPES) {
+    // Only Person and Mantal record a gender, so falling back to the document
+    // types would make a gender filter on its own return nothing at all.
+    const defaultObjectTypes = gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
+
+    for (const objectType of requestedObjectTypes.length > 0 ? requestedObjectTypes : defaultObjectTypes) {
       params.append('objectType', objectType);
     }
 
@@ -144,6 +159,9 @@ export class DocumentController {
       objectTotal: countFor(typeCounts, 'Föremål'),
       audioTotal: countFor(typeCounts, 'Ljud'),
       textTotal: countFor(typeCounts, 'Text'),
+      personTotal: countFor(typeCounts, 'Person'),
+      censusTotal: countFor(typeCounts, 'Mantal'),
+      seamanTotal: countFor(typeCounts, 'Sjöman'),
       page: _meta?.page ?? safePage,
       pageSize: _meta?.limit ?? safePageSize,
       message: 'success',
