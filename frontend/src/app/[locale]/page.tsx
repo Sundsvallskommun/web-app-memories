@@ -16,13 +16,19 @@ import { TypeFilter } from '@components/search-filters/type-filter.component';
 import { searchDocuments } from '@services/document-service';
 
 const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
-// Registers of people and organisations. Searchable, but not documents, so they
-// only appear when picked rather than in an unfiltered search.
 const REGISTERS: DocumentType[] = ['Person', 'Census', 'Seaman'];
-// Sjöman is missing on purpose: the source has no gender column for seamen, so
-// any gender filter excludes all 116 094 of them.
 const GENDERED_REGISTERS: DocumentType[] = ['Person', 'Census'];
 const ALL_TYPES: DocumentType[] = [...TYPES, ...REGISTERS];
+
+const TYPES_SUPPORTING: Record<'gender' | 'creator' | 'location', DocumentType[]> = {
+  gender: GENDERED_REGISTERS,
+  creator: TYPES,
+  location: [...TYPES, 'Person', 'Seaman'],
+};
+
+/** An empty selection means the six document types, which is what a plain search returns. */
+const supports = (filter: keyof typeof TYPES_SUPPORTING, types: DocumentType[]): boolean =>
+  (types.length > 0 ? types : TYPES).every((type) => TYPES_SUPPORTING[filter].includes(type));
 
 const GRID_CLASS = 'flex flex-wrap list-none p-0 gap-24';
 const GRID_ITEM_CLASS = 'flex w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[calc(25%-18px)]';
@@ -48,15 +54,8 @@ type SortBy = (typeof SORT_KEYS)[number];
 type SortDirection = 'asc' | 'desc';
 const PAGE_SIZE_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
-// Defaults; these are elided from the URL so a plain `/sv` stays clean.
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 12;
-
-// ---------------------------------------------------------------------------
-// URL-param parsing helpers. All six pieces of search state live in the URL
-// so back-button from the detail page restores the exact view the user was
-// looking at, page reloads keep the filter, and filtered URLs are shareable.
-// ---------------------------------------------------------------------------
 
 const parseTypes = (raw: string | null): DocumentType[] => [
   ...new Set(
@@ -93,7 +92,6 @@ const parseYear = (raw: string | null): number | undefined => {
   return Number.isInteger(n) && n >= MIN_YEAR && n <= MAX_YEAR ? n : undefined;
 };
 
-// Chip text
 const periodLabelFor = (yearFrom?: number, yearTo?: number): string | undefined => {
   if (yearFrom && yearTo) return `${yearFrom} - ${yearTo}`;
   if (yearFrom) return `Från ${yearFrom}`;
@@ -106,8 +104,7 @@ const SearchPage: React.FC = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Derive current search state from the URL on every render. No useState for
-  // these — the URL is the single source of truth.
+  // No useState for these, the URL is the single source of truth.
   const query = searchParams.get('q') ?? '';
   const selectedTypes = parseTypes(searchParams.get('type'));
   const sortBy = parseSortBy(searchParams.get('sort'));
@@ -121,11 +118,7 @@ const SearchPage: React.FC = () => {
   const genderParam = searchParams.get('gender')?.trim();
   const gender = genderParam && GENDERS.includes(genderParam) ? genderParam : undefined;
 
-  // The only piece of local state: what's currently typed in the search input.
-  // We don't commit this to the URL on every keystroke (that would hammer the
-  // API). Committed only on Enter / "Sök" click.
   const [queryDraft, setQueryDraft] = useState(query);
-  // Keep the draft in sync when the URL changes from outside (back/forward).
   useEffect(() => {
     setQueryDraft(query);
   }, [query]);
@@ -135,8 +128,6 @@ const SearchPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResult | null>(null);
 
-  // Merge a patch into the current URL params and replace the URL without
-  // scrolling to top. Resets `page` to 1 unless the patch sets it explicitly.
   const updateParams = useCallback(
     (patch: Record<string, string | undefined>) => {
       const next = new URLSearchParams(searchParams.toString());
@@ -144,8 +135,6 @@ const SearchPage: React.FC = () => {
         if (v === undefined || v === '') next.delete(k);
         else next.set(k, v);
       }
-      // When filters/sort change, always return to page 1 — offsets aren't
-      // meaningful across different result sets.
       if (
         !('page' in patch) &&
         ('type' in patch ||
@@ -167,12 +156,7 @@ const SearchPage: React.FC = () => {
     [searchParams, router, pathname]
   );
 
-  // Single searcher: fires whenever any URL-backed state changes.
-  // A gender on its own does not describe a search: only Person and Mantal
-  // record one, so the BFF falls back to those two. Write that into the URL so
-  // the panel, the chips and the results cannot disagree, however the page was
-  // reached: a shared link, the back button, or a hand-edited address.
-  const supportsGender = selectedTypes.length > 0 && selectedTypes.every((type) => GENDERED_REGISTERS.includes(type));
+  const supportsGender = supports('gender', selectedTypes);
   useEffect(() => {
     if (gender && !supportsGender) {
       updateParams({ type: GENDERED_REGISTERS.join(',') });
@@ -236,49 +220,34 @@ const SearchPage: React.FC = () => {
 
   const handleTypeToggle = (type: DocumentType) => {
     const next = selectedTypes.includes(type) ? selectedTypes.filter((t) => t !== type) : [...selectedTypes, type];
-    updateParams({ type: next.length > 0 ? next.join(',') : undefined, ...clearedGenderIfUnsupported(next) });
+    updateParams({ type: next.length > 0 ? next.join(',') : undefined, ...clearedUnsupportedFilters(next) });
   };
 
-  // Ticks all three registers at once, or clears them when they are all on.
-  // Document types already selected are left alone, since the two dropdowns
-  // write to the same parameter.
   const handleAllRegisters = () => {
     const documentTypes = selectedTypes.filter((type) => !REGISTERS.includes(type));
     const allOn = REGISTERS.every((type) => selectedTypes.includes(type));
     const next = allOn ? documentTypes : [...documentTypes, ...REGISTERS];
-    updateParams({ type: next.length > 0 ? next.join(',') : undefined, ...clearedGenderIfUnsupported(next) });
+    updateParams({ type: next.length > 0 ? next.join(',') : undefined, ...clearedUnsupportedFilters(next) });
   };
 
-  // Gender is one flat condition upstream, applied to the whole query rather than
-  // to the person part of it. Anything without the column fails it, so a gender
-  // alongside Foto returns no photos at all, and alongside Sjöman returns
-  // nothing whatsoever.
-  //
-  // Rather than let the panel promise what the search cannot deliver, the two
-  // are kept consistent in both directions: a gender narrows the selection to
-  // the registers that record one, and choosing anything else drops the gender.
-  // Ask Linus whether gender can ignore records without the column instead, and
-  // this restriction can go.
+  const clearedUnsupportedFilters = (types: DocumentType[]) => ({
+    ...(gender && !supports('gender', types) ? { gender: undefined } : {}),
+    ...(creator && !supports('creator', types) ? { creator: undefined } : {}),
+    ...(location && !supports('location', types) ? { location: undefined } : {}),
+  });
 
-  /** A gender only holds while every selected type can carry one. */
-  const supportsGenderFor = (types: DocumentType[]) =>
-    types.length > 0 && types.every((type) => GENDERED_REGISTERS.includes(type));
-
-  /** Drop the gender as soon as the selection stops supporting it. */
-  const clearedGenderIfUnsupported = (types: DocumentType[]) =>
-    gender && !supportsGenderFor(types) ? { gender: undefined } : {};
-
-  const handleGenderChange = (next?: string) => {
-    if (!next) {
-      updateParams({ gender: undefined });
+  const applyScopedFilter = (filter: keyof typeof TYPES_SUPPORTING, value?: string) => {
+    if (!value) {
+      updateParams({ [filter]: undefined });
       return;
     }
 
-    // Keep only what can carry a gender, defaulting to both registers when the
-    // user had picked neither.
-    const kept = selectedTypes.filter((type) => GENDERED_REGISTERS.includes(type));
-    const types = kept.length > 0 ? kept : GENDERED_REGISTERS;
-    updateParams({ gender: next, type: types.join(',') });
+    const kept = selectedTypes.filter((type) => TYPES_SUPPORTING[filter].includes(type));
+    const types =
+      kept.length > 0 ? kept
+      : filter === 'gender' ? GENDERED_REGISTERS
+      : [];
+    updateParams({ [filter]: value, type: types.length > 0 ? types.join(',') : undefined });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -295,7 +264,6 @@ const SearchPage: React.FC = () => {
     });
   };
 
-  // Which option the URL state corresponds to, or undefined for relevance.
   const activeSort =
     sortBy && sortDirection ?
       SORT_OPTIONS.find((o) => o.sortBy === sortBy && o.sortDirection === sortDirection)?.value
@@ -393,7 +361,7 @@ const SearchPage: React.FC = () => {
                   placeholder="Skriv en plats"
                   applyLabel="Visa plats"
                   value={location}
-                  onApply={(next) => updateParams({ location: next })}
+                  onApply={(next) => applyScopedFilter('location', next)}
                   data-cy="place-filter"
                 />
                 <TextFilter
@@ -401,7 +369,7 @@ const SearchPage: React.FC = () => {
                   placeholder="Skriv ett namn"
                   applyLabel="Visa upphovsperson"
                   value={creator}
-                  onApply={(next) => updateParams({ creator: next })}
+                  onApply={(next) => applyScopedFilter('creator', next)}
                   data-cy="creator-filter"
                 />
                 <PersonFilter
@@ -410,7 +378,7 @@ const SearchPage: React.FC = () => {
                   countFor={getTypeCount}
                   onToggleRegister={handleTypeToggle}
                   gender={gender}
-                  onGenderChange={handleGenderChange}
+                  onGenderChange={(next) => applyScopedFilter('gender', next)}
                   onToggleAllRegisters={handleAllRegisters}
                 />
               </div>
