@@ -78,6 +78,8 @@ export interface SearchParams {
   creator?: string;
   /** One of Man, Kvinna or Okänt. Only the person registers record one. */
   gender?: string;
+  /** Ids of creating organisations. Several are alternatives, so they widen. */
+  organisations?: number[];
   // Constrained to the fields the combined search can sort on.
   sortBy?: 'year' | 'title' | 'objectType';
   sortDirection?: 'asc' | 'desc';
