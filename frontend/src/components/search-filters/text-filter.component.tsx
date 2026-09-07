@@ -15,13 +15,18 @@ interface Props {
   'data-cy'?: string;
 }
 
-export const TextFilter: React.FC<Props> = ({
+interface BodyProps extends Props {
+  autoApply?: boolean;
+}
+
+export const TextFilterBody: React.FC<BodyProps> = ({
   label,
   fieldLabel,
   placeholder,
   applyLabel,
   value,
   onApply,
+  autoApply,
   'data-cy': dataCy,
 }) => {
   const [draft, setDraft] = useState(value ?? '');
@@ -33,36 +38,41 @@ export const TextFilter: React.FC<Props> = ({
   const apply = () => onApply(draft.trim() || undefined);
 
   return (
-    <div className="relative">
-      <PopupMenu type="dialog">
-        <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy={dataCy}>
-          {label}
-        </PopupMenu.Button>
+    <div className="flex flex-col gap-8 w-full">
+      <FormControl className="w-full">
+        {fieldLabel && <FormLabel>{fieldLabel}</FormLabel>}
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && apply()}
+          onBlur={autoApply ? apply : undefined}
+          placeholder={placeholder}
+          aria-label={fieldLabel ? undefined : label}
+          data-cy={dataCy ? `${dataCy}-input` : undefined}
+        />
+      </FormControl>
 
-        <PopupMenu.Panel className="p-16 w-max">
-          <div className="flex flex-col gap-8 w-full">
-            <FormControl className="w-full">
-              {fieldLabel && <FormLabel>{fieldLabel}</FormLabel>}
-              <Input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && apply()}
-                placeholder={placeholder}
-                // Without a visible label the field still needs a name, and the
-                // dropdown's own label is the one the user just clicked.
-                aria-label={fieldLabel ? undefined : label}
-                data-cy={dataCy ? `${dataCy}-input` : undefined}
-              />
-            </FormControl>
-
-            <Button color="primary" onClick={apply} className="mt-8">
-              {applyLabel}
-            </Button>
-          </div>
-        </PopupMenu.Panel>
-      </PopupMenu>
+      {!autoApply && (
+        <Button color="primary" onClick={apply} className="mt-8">
+          {applyLabel}
+        </Button>
+      )}
     </div>
   );
 };
+
+export const TextFilter: React.FC<Props> = (props) => (
+  <div className="relative">
+    <PopupMenu type="dialog">
+      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy={props['data-cy']}>
+        {props.label}
+      </PopupMenu.Button>
+
+      <PopupMenu.Panel className="p-16 w-max">
+        <TextFilterBody {...props} />
+      </PopupMenu.Panel>
+    </PopupMenu>
+  </div>
+);
 
 export default TextFilter;

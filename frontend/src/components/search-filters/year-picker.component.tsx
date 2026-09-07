@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Icon, Input } from '@sk-web-gui/react';
+import { Button, Icon, Input, cx } from '@sk-web-gui/react';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const YEARS_PER_PAGE = 10;
@@ -13,10 +13,18 @@ interface Props {
   onChange: (value: string) => void;
   onPick?: (year: number) => void;
   onEnter?: () => void;
+  align?: 'left' | 'right';
   'data-cy'?: string;
 }
 
-export const YearPicker: React.FC<Props> = ({ value, onChange, onPick, onEnter, 'data-cy': dataCy }) => {
+export const YearPicker: React.FC<Props> = ({
+  value,
+  onChange,
+  onPick,
+  onEnter,
+  align = 'left',
+  'data-cy': dataCy,
+}) => {
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState(() => pageStart(Number(value) || new Date().getFullYear()));
   const wrapper = useRef<HTMLDivElement>(null);
@@ -57,9 +65,10 @@ export const YearPicker: React.FC<Props> = ({ value, onChange, onPick, onEnter, 
   const selected = Number(value);
 
   return (
-    <div ref={wrapper} className="relative">
+    <div ref={wrapper} className="relative w-full">
       <Input.InnerGroup className="w-full">
         <Input
+          className="w-full"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
@@ -75,7 +84,10 @@ export const YearPicker: React.FC<Props> = ({ value, onChange, onPick, onEnter, 
 
       {open && (
         <div
-          className="absolute z-10 mt-4 rounded-cards border-1 border-divider bg-background-content p-8 shadow-100"
+          className={cx(
+            'absolute z-10 mt-4 min-w-[220px] rounded-cards border-1 border-divider bg-background-content p-8 shadow-100',
+            align === 'right' ? 'right-0' : 'left-0'
+          )}
           data-cy={dataCy ? `${dataCy}-grid` : undefined}
         >
           <div className="flex items-center justify-between gap-8 mb-8">
