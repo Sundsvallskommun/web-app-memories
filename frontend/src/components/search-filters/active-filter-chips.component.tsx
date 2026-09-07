@@ -2,7 +2,15 @@
 
 import { Button, Chip } from '@sk-web-gui/react';
 import { DOCUMENT_TYPE_LABELS } from '@data-contracts/document';
-import { EMPTY_FILTERS, FilterState, setPeriod, setScoped, toggleOrganisation, toggleType } from '@utils/filter-state';
+import {
+  EMPTY_FILTERS,
+  FilterState,
+  setPeriod,
+  setScoped,
+  toggleCategory,
+  toggleOrganisation,
+  toggleType,
+} from '@utils/filter-state';
 import { periodLabelFor } from '@utils/search-params';
 
 interface ActiveChip {
@@ -53,6 +61,14 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
       key: `organisation-${organisation.id}`,
       label: organisation.name,
       clear: () => onChange(toggleOrganisation(filters, organisation)),
+    });
+  }
+
+  for (const category of filters.categories) {
+    chips.push({
+      key: `category-${category}`,
+      label: category,
+      clear: () => onChange(toggleCategory(filters, category)),
     });
   }
 

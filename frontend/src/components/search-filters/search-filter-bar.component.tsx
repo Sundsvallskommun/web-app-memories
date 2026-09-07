@@ -5,6 +5,7 @@ import { Button } from '@sk-web-gui/react';
 import { ListFilter } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, DocumentType } from '@data-contracts/document';
 import { FilterModal, FilterRow } from '@components/search-filters/filter-modal.component';
+import { CategoryFilter, CategoryFilterBody } from '@components/search-filters/category-filter.component';
 import { FilterItem, FilterOverflowRow } from '@components/search-filters/filter-overflow-row.component';
 import { OrganisationFilter, OrganisationFilterBody } from '@components/search-filters/organisation-filter.component';
 import { PeriodFilter, PeriodFilterBody } from '@components/search-filters/period-filter.component';
@@ -19,6 +20,7 @@ import {
   setPeriod,
   setScoped,
   toggleAllRegisters,
+  toggleCategory,
   toggleOrganisation,
   toggleType,
 } from '@utils/filter-state';
@@ -109,6 +111,15 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, onChange }
         <OrganisationFilter
           selected={filters.organisations}
           onToggle={(organisation) => onChange(toggleOrganisation(filters, organisation))}
+        />
+      ),
+    },
+    {
+      key: 'category',
+      node: (
+        <CategoryFilter
+          selected={filters.categories}
+          onToggle={(category) => onChange(toggleCategory(filters, category))}
         />
       ),
     },
@@ -208,6 +219,17 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, onChange }
           selected={draft.organisations}
           onToggle={(organisation) => setDraft(toggleOrganisation(draft, organisation))}
           hideLabel
+        />
+      ),
+    },
+    {
+      key: 'category',
+      label: 'Verksamhetskategori',
+      summary: draft.categories.join(', ') || NOTHING,
+      body: (
+        <CategoryFilterBody
+          selected={draft.categories}
+          onToggle={(category) => setDraft(toggleCategory(draft, category))}
         />
       ),
     },

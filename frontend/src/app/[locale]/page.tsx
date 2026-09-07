@@ -51,6 +51,15 @@ const SearchPage: React.FC = () => {
     ),
   ];
   const organisationIdsKey = organisationIds.join(',');
+  const categories = [
+    ...new Set(
+      (urlParams.get('category') ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    ),
+  ];
+  const categoriesKey = categories.join(',');
   const genderParam = urlParams.get('gender')?.trim();
   const gender = genderParam && GENDERS.includes(genderParam) ? genderParam : undefined;
 
@@ -96,6 +105,7 @@ const SearchPage: React.FC = () => {
     creator,
     gender,
     organisations: selectedOrganisations,
+    categories,
   };
 
   const [failed, setFailed] = useState(false);
@@ -122,7 +132,8 @@ const SearchPage: React.FC = () => {
           'location' in patch ||
           'creator' in patch ||
           'gender' in patch ||
-          'org' in patch)
+          'org' in patch ||
+          'category' in patch)
       ) {
         next.delete('page');
       }
@@ -150,6 +161,7 @@ const SearchPage: React.FC = () => {
         creator,
         gender,
         organisationIds,
+        categories,
         sortBy,
         sortDirection,
         page,
@@ -165,6 +177,7 @@ const SearchPage: React.FC = () => {
       creator,
       gender,
       organisationIdsKey,
+      categoriesKey,
       sortBy,
       sortDirection,
       page,
@@ -183,6 +196,7 @@ const SearchPage: React.FC = () => {
       creator,
       gender,
       organisations: organisationIds,
+      categories,
       sortBy,
       sortDirection,
       page,
