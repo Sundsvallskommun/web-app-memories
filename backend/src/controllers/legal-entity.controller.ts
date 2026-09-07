@@ -4,6 +4,7 @@ import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
 import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
+import { getCategories, getEntitiesInCategory } from '@services/legal-entity-index.service';
 
 interface UpstreamLegalEntity {
   legalEntityId: number;
@@ -38,14 +39,21 @@ export class LegalEntityController {
   @Get('/organisations')
   async searchOrganisations(
     @QueryParam('name') name: string,
+    @QueryParam('category') category: string,
     @QueryParam('limit') limit: number = MAX_RESULTS,
     @Res() response: Response,
   ) {
     const trimmed = name?.trim();
+    const trimmedCategory = category?.trim();
     // Without a term the only available ordering is alphabetical, which is
     // useless as a starting list, so say so rather than returning noise.
-    if (!trimmed) {
+    if (!trimmed && !trimmedCategory) {
       return response.send({ data: [], total: 0, message: 'success' });
+    }
+
+    if (trimmedCategory) {
+      const inCategory = await getEntitiesInCategory(trimmedCategory, trimmed);
+      return response.send({ data: inCategory, total: inCategory.length, message: 'success' });
     }
 
     const params = new URLSearchParams({
@@ -64,6 +72,17 @@ export class LegalEntityController {
       total: res.data._meta?.totalRecords ?? 0,
       message: 'success',
     });
+  }
+
+  /**
+   * The categories organisations are grouped into, for the Verksamhetskategori
+   * filter. Resolved from our own index: upstream returns a category on every
+   * organisation but cannot filter on one.
+   */
+  @Get('/organisation-categories')
+  async listCategories(@Res() response: Response) {
+    const categories = await getCategories();
+    return response.send({ data: categories, total: categories.length, message: 'success' });
   }
 
   /**
