@@ -4,6 +4,7 @@ import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
 import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
+import { MAX_CREATOR_IDS, getEntityIdsInCategories } from '@services/legal-entity-index.service';
 import {
   Audio,
   CensusRecord,
@@ -105,6 +106,7 @@ export class DocumentController {
     @QueryParam('creator') creator: string,
     @QueryParam('gender') gender: string,
     @QueryParam('organisation') organisation: string,
+    @QueryParam('category') category: string,
     @Res() response: Response,
   ) {
     const safePageSize = Math.max(1, pageSize);
@@ -129,9 +131,55 @@ export class DocumentController {
     // document type and all 116k seamen, who have no such column upstream.
     if (gender?.trim()) params.set('gender', gender.trim());
 
-    for (const id of (organisation ?? '').split(',').map(value => value.trim())) {
-      if (/^\d+$/.test(id)) params.append('creatorLegalEntityId', id);
+    // A category is a set of organisations. Upstream cannot filter on one, so
+    // we expand it here into the ids it holds, alongside any picked by name.
+    const requestedCategories = (category ?? '')
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean);
+    const categoryIds = await getEntityIdsInCategories(requestedCategories);
+    const organisationIds = new Set(
+      (organisation ?? '')
+        .split(',')
+        .map(value => value.trim())
+        .filter(value => /^\d+$/.test(value)),
+    );
+    for (const id of categoryIds) organisationIds.add(String(id));
+
+    // The archive takes at most 200 of these in one search, measured: 200 goes
+    // through and 201 comes back as a 400. Say which filter is too wide rather
+    // than letting the search fail with no explanation.
+    if (organisationIds.size > MAX_CREATOR_IDS) {
+      throw new HttpException(
+        400,
+        `De valda kategorierna omfattar ${organisationIds.size} organisationer, fler än de ${MAX_CREATOR_IDS} som arkivet tar emot i en sökning.`,
+      );
     }
+
+    // A category the register does not know, or one holding no organisations,
+    // means nothing can match. Without this the filter would fall away silently
+    // and the search would return everything.
+    if (requestedCategories.length > 0 && organisationIds.size === 0) {
+      return response.send({
+        data: [],
+        total: 0,
+        totalPages: 0,
+        filmTotal: 0,
+        publicationTotal: 0,
+        photoTotal: 0,
+        objectTotal: 0,
+        audioTotal: 0,
+        textTotal: 0,
+        personTotal: 0,
+        censusTotal: 0,
+        seamanTotal: 0,
+        page: safePage,
+        pageSize: safePageSize,
+        message: 'success',
+      });
+    }
+
+    for (const id of organisationIds) params.append('creatorLegalEntityId', id);
 
     const requestedObjectTypes = [
       ...new Set(
