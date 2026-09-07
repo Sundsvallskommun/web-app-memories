@@ -9,20 +9,23 @@ import { ChevronDown, X } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, DocumentType, SearchParams, SearchResult } from '@data-contracts/document';
 import { DocumentCard } from '@components/document-card/document-card.component';
 import { DocumentCardSkeleton } from '@components/document-card/document-card-skeleton.component';
+import { OrganisationFilter } from '@components/search-filters/organisation-filter.component';
 import { PeriodFilter } from '@components/search-filters/period-filter.component';
 import { PersonFilter, GENDERS } from '@components/search-filters/person-filter.component';
 import { TextFilter } from '@components/search-filters/text-filter.component';
 import { TypeFilter } from '@components/search-filters/type-filter.component';
 import { searchDocuments } from '@services/document-service';
+import { Organisation, getOrganisation } from '@services/organisation-service';
 
 const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
 const REGISTERS: DocumentType[] = ['Person', 'Census', 'Seaman'];
 const GENDERED_REGISTERS: DocumentType[] = ['Person', 'Census'];
 const ALL_TYPES: DocumentType[] = [...TYPES, ...REGISTERS];
 
-const TYPES_SUPPORTING: Record<'gender' | 'creator' | 'location', DocumentType[]> = {
+const TYPES_SUPPORTING: Record<'gender' | 'creator' | 'location' | 'organisation', DocumentType[]> = {
   gender: GENDERED_REGISTERS,
   creator: TYPES,
+  organisation: TYPES,
   location: [...TYPES, 'Person', 'Seaman'],
 };
 
@@ -115,6 +118,15 @@ const SearchPage: React.FC = () => {
   const yearTo = parseYear(searchParams.get('to'));
   const location = searchParams.get('location')?.trim() || undefined;
   const creator = searchParams.get('creator')?.trim() || undefined;
+  const organisationIds = [
+    ...new Set(
+      (searchParams.get('org') ?? '')
+        .split(',')
+        .map((value) => Number(value.trim()))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    ),
+  ];
+  const organisationKey = organisationIds.join(',');
   const genderParam = searchParams.get('gender')?.trim();
   const gender = genderParam && GENDERS.includes(genderParam) ? genderParam : undefined;
 
@@ -122,6 +134,34 @@ const SearchPage: React.FC = () => {
   useEffect(() => {
     setQueryDraft(query);
   }, [query]);
+
+  const [knownOrganisations, setKnownOrganisations] = useState<Record<number, string>>({});
+  const missingNames = organisationIds.filter((id) => !knownOrganisations[id]);
+  const missingKey = missingNames.join(',');
+  useEffect(() => {
+    if (missingNames.length === 0) return;
+    let cancelled = false;
+
+    Promise.all(missingNames.map((id) => getOrganisation(id))).then((found) => {
+      if (cancelled) return;
+      const named = found.filter((organisation): organisation is Organisation => !!organisation);
+      if (named.length > 0) {
+        setKnownOrganisations((previous) => ({
+          ...previous,
+          ...Object.fromEntries(named.map((organisation) => [organisation.id, organisation.name])),
+        }));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [missingKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedOrganisations: Organisation[] = organisationIds.map((id) => ({
+    id,
+    name: knownOrganisations[id] ?? String(id),
+  }));
 
   const [failed, setFailed] = useState(false);
   const [retryToken, setRetryToken] = useState(0);
@@ -146,7 +186,8 @@ const SearchPage: React.FC = () => {
           'to' in patch ||
           'location' in patch ||
           'creator' in patch ||
-          'gender' in patch)
+          'gender' in patch ||
+          'org' in patch)
       ) {
         next.delete('page');
       }
@@ -173,12 +214,27 @@ const SearchPage: React.FC = () => {
         location,
         creator,
         gender,
+        organisationIds,
         sortBy,
         sortDirection,
         page,
         pageSize,
       }),
-    [query, selectedTypes, yearFrom, yearTo, location, creator, gender, sortBy, sortDirection, page, pageSize]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      query,
+      selectedTypes,
+      yearFrom,
+      yearTo,
+      location,
+      creator,
+      gender,
+      organisationKey,
+      sortBy,
+      sortDirection,
+      page,
+      pageSize,
+    ]
   );
 
   useEffect(() => {
@@ -191,6 +247,7 @@ const SearchPage: React.FC = () => {
       location,
       creator,
       gender,
+      organisations: organisationIds,
       sortBy,
       sortDirection,
       page,
@@ -234,6 +291,7 @@ const SearchPage: React.FC = () => {
     ...(gender && !supports('gender', types) ? { gender: undefined } : {}),
     ...(creator && !supports('creator', types) ? { creator: undefined } : {}),
     ...(location && !supports('location', types) ? { location: undefined } : {}),
+    ...(organisationIds.length > 0 && !supports('organisation', types) ? { org: undefined } : {}),
   });
 
   const applyScopedFilter = (filter: keyof typeof TYPES_SUPPORTING, value?: string) => {
@@ -248,6 +306,20 @@ const SearchPage: React.FC = () => {
       : filter === 'gender' ? GENDERED_REGISTERS
       : [];
     updateParams({ [filter]: value, type: types.length > 0 ? types.join(',') : undefined });
+  };
+
+  const handleOrganisationToggle = (organisation: Organisation) => {
+    const on = organisationIds.includes(organisation.id);
+    const next = on ? organisationIds.filter((id) => id !== organisation.id) : [...organisationIds, organisation.id];
+    setKnownOrganisations((previous) => ({ ...previous, [organisation.id]: organisation.name }));
+
+    const kept = selectedTypes.filter((type) => TYPES_SUPPORTING.organisation.includes(type));
+    updateParams({
+      org: next.length > 0 ? next.join(',') : undefined,
+      ...(next.length > 0 && kept.length !== selectedTypes.length ?
+        { type: kept.length > 0 ? kept.join(',') : undefined }
+      : {}),
+    });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -299,6 +371,9 @@ const SearchPage: React.FC = () => {
   if (gender) {
     activeFilters.push({ label: gender, clear: () => updateParams({ gender: undefined }) });
   }
+  for (const organisation of selectedOrganisations) {
+    activeFilters.push({ label: organisation.name, clear: () => handleOrganisationToggle(organisation) });
+  }
 
   const clearAllFilters = () =>
     updateParams({
@@ -308,6 +383,7 @@ const SearchPage: React.FC = () => {
       location: undefined,
       creator: undefined,
       gender: undefined,
+      org: undefined,
     });
 
   const getTypeCount = (type: DocumentType): number => {
@@ -372,6 +448,7 @@ const SearchPage: React.FC = () => {
                   onApply={(next) => applyScopedFilter('creator', next)}
                   data-cy="creator-filter"
                 />
+                <OrganisationFilter selected={selectedOrganisations} onToggle={handleOrganisationToggle} />
                 <PersonFilter
                   registers={REGISTERS}
                   selectedRegisters={selectedTypes.filter((t) => REGISTERS.includes(t))}
