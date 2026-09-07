@@ -80,6 +80,8 @@ export interface SearchParams {
   gender?: string;
   /** Ids of creating organisations. Several are alternatives, so they widen. */
   organisations?: number[];
+  /** Names of organisation categories, each standing for the organisations in it. */
+  categories?: string[];
   // Constrained to the fields the combined search can sort on.
   sortBy?: 'year' | 'title' | 'objectType';
   sortDirection?: 'asc' | 'desc';

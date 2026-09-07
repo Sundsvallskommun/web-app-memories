@@ -28,6 +28,22 @@ export const searchOrganisations = async (name: string): Promise<Organisation[]>
   return response?.data?.data ?? [];
 };
 
+/** A category of organisations, for the Verksamhetskategori filter. */
+export interface OrganisationCategory {
+  name: string;
+  /** How many organisations it holds. */
+  count: number;
+  /** False when the archive would reject a search that wide. */
+  supported: boolean;
+}
+
+/** The categories organisations are grouped into, with their sizes. */
+export const getOrganisationCategories = async (): Promise<OrganisationCategory[]> => {
+  const response = await apiService.get<{ data: OrganisationCategory[] }>('organisation-categories');
+  return response?.data?.data ?? [];
+};
+
+/** One organisation by id, so a shared link can label its filter chips. */
 export const getOrganisation = async (id: number): Promise<Organisation | null> => {
   try {
     const response = await apiService.get<SingleResponse>(`organisations/${id}`);

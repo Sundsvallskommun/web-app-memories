@@ -35,6 +35,7 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
   if (params.creator) queryParams.creator = params.creator;
   if (params.gender) queryParams.gender = params.gender;
   if (params.organisations?.length) queryParams.organisation = params.organisations.join(',');
+  if (params.categories?.length) queryParams.category = params.categories.join(',');
   if (params.sortBy) queryParams.sortBy = params.sortBy;
   if (params.sortDirection) queryParams.sortDirection = params.sortDirection;
 

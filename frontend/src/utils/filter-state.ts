@@ -6,12 +6,14 @@ export const REGISTERS: DocumentType[] = ['Person', 'Census', 'Seaman'];
 export const GENDERED_REGISTERS: DocumentType[] = ['Person', 'Census'];
 export const ALL_TYPES: DocumentType[] = [...TYPES, ...REGISTERS];
 
-export const TYPES_SUPPORTING: Record<'gender' | 'creator' | 'location' | 'organisation', DocumentType[]> = {
-  gender: GENDERED_REGISTERS,
-  creator: TYPES,
-  organisation: TYPES,
-  location: [...TYPES, 'Person', 'Seaman'],
-};
+export const TYPES_SUPPORTING: Record<'gender' | 'creator' | 'location' | 'organisation' | 'category', DocumentType[]> =
+  {
+    gender: GENDERED_REGISTERS,
+    creator: TYPES,
+    organisation: TYPES,
+    category: TYPES,
+    location: [...TYPES, 'Person', 'Seaman'],
+  };
 
 export type ScopedFilter = 'gender' | 'creator' | 'location';
 
@@ -27,9 +29,10 @@ export interface FilterState {
   creator?: string;
   gender?: string;
   organisations: Organisation[];
+  categories: string[];
 }
 
-export const EMPTY_FILTERS: FilterState = { types: [], organisations: [] };
+export const EMPTY_FILTERS: FilterState = { types: [], organisations: [], categories: [] };
 
 export const withTypes = (state: FilterState, types: DocumentType[]): FilterState => ({
   ...state,
@@ -38,6 +41,7 @@ export const withTypes = (state: FilterState, types: DocumentType[]): FilterStat
   creator: state.creator && !supports('creator', types) ? undefined : state.creator,
   location: state.location && !supports('location', types) ? undefined : state.location,
   organisations: state.organisations.length > 0 && !supports('organisation', types) ? [] : state.organisations,
+  categories: state.categories.length > 0 && !supports('category', types) ? [] : state.categories,
 });
 
 export const toggleType = (state: FilterState, type: DocumentType): FilterState =>
@@ -77,6 +81,14 @@ export const toggleOrganisation = (state: FilterState, organisation: Organisatio
   return { ...state, organisations, types: organisations.length > 0 ? kept : state.types };
 };
 
+export const toggleCategory = (state: FilterState, category: string): FilterState => {
+  const on = state.categories.includes(category);
+  const categories = on ? state.categories.filter((one) => one !== category) : [...state.categories, category];
+
+  const kept = state.types.filter((type) => TYPES_SUPPORTING.category.includes(type));
+  return { ...state, categories, types: categories.length > 0 ? kept : state.types };
+};
+
 export const setPeriod = (state: FilterState, yearFrom?: number, yearTo?: number): FilterState => ({
   ...state,
   yearFrom,
@@ -92,4 +104,5 @@ export const filterParams = (state: FilterState): Record<string, string | undefi
   creator: state.creator,
   gender: state.gender,
   org: state.organisations.length > 0 ? state.organisations.map((one) => one.id).join(',') : undefined,
+  category: state.categories.length > 0 ? state.categories.join(',') : undefined,
 });
