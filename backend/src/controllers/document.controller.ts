@@ -104,6 +104,7 @@ export class DocumentController {
     @QueryParam('location') location: string,
     @QueryParam('creator') creator: string,
     @QueryParam('gender') gender: string,
+    @QueryParam('organisation') organisation: string,
     @Res() response: Response,
   ) {
     const safePageSize = Math.max(1, pageSize);
@@ -127,6 +128,10 @@ export class DocumentController {
     // Only the person registers record a gender, so this also excludes every
     // document type and all 116k seamen, who have no such column upstream.
     if (gender?.trim()) params.set('gender', gender.trim());
+
+    for (const id of (organisation ?? '').split(',').map(value => value.trim())) {
+      if (/^\d+$/.test(id)) params.append('creatorLegalEntityId', id);
+    }
 
     const requestedObjectTypes = [
       ...new Set(
