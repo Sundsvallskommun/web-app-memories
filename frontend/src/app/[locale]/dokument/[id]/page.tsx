@@ -26,6 +26,11 @@ const metaRows = (doc: Document): { label: string; value: string }[] =>
     { label: 'Tidpunkt', value: doc.year ? String(doc.year) : '' },
   ].filter((row) => !!row.value);
 
+const FILE_BEARING_TYPES = new Set(['Photo', 'Object', 'Film', 'Audio', 'Text', 'Publication']);
+
+const isMissingItsFile = (doc: Document): boolean =>
+  FILE_BEARING_TYPES.has(doc.type) && (doc.files ?? []).length === 0 && (doc.media ?? []).length === 0;
+
 const DocumentDetailPage: React.FC = () => {
   const params = useParams();
   const router = useRouter();
@@ -131,6 +136,13 @@ const DocumentDetailPage: React.FC = () => {
           <div className="bg-background-200 rounded-cards px-16 py-24 flex flex-col gap-32 md:px-72 md:py-40">
             <div className="flex flex-col items-center gap-16">
               <DocumentPreview doc={doc} />
+
+              {isMissingItsFile(doc) && (
+                <p className="text-center text-dark-secondary" data-cy="document-no-file">
+                  Det finns ingen digitaliserad fil för det här objektet. Uppgifterna nedan kommer från arkivets
+                  katalog.
+                </p>
+              )}
 
               {doc.description && <p className="text-center font-bold">{doc.description}</p>}
 

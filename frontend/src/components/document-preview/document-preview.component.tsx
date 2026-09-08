@@ -101,7 +101,7 @@ const ImagePreview: React.FC<{ doc: Document }> = ({ doc }) => {
   if (failed) {
     return (
       <div className="bg-background-200 rounded-cards p-lg text-center text-dark-secondary" data-cy="preview-missing">
-        Förhandsvisning saknas — filen kunde inte hämtas från arkivet.
+        Förhandsvisning saknas, filen kunde inte hämtas från arkivet.
       </div>
     );
   }
