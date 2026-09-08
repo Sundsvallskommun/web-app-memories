@@ -29,6 +29,8 @@ const SCOPED_LABELS: Record<ScopedFilter, string> = {
 
 const scopedFilters = Object.keys(SCOPED_LABELS) as ScopedFilter[];
 
+const NAMED_ON_CHIP = new Set(['Plats', 'Upphovsperson', 'Verksamhetskategori']);
+
 interface Props {
   filters: FilterState;
   onChange: (next: FilterState) => void;
@@ -85,8 +87,18 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
   return (
     <div className="flex flex-wrap items-center gap-8" data-cy="active-filters">
       {chips.map((chip) => (
-        <Chip key={chip.key} onClick={chip.clear} aria-label={`Ta bort filtret ${chip.filter}: ${chip.label}`}>
-          {chip.label}
+        <Chip
+          key={chip.key}
+          onClick={chip.clear}
+          aria-label={`Ta bort filtret ${chip.filter}: ${chip.label}`}
+          className="h-auto min-h-34 max-w-full py-4 text-left"
+        >
+          <span className="min-w-0">
+            {NAMED_ON_CHIP.has(chip.filter) && (
+              <span className="block text-[85%] text-dark-placeholder sm:inline">{chip.filter} </span>
+            )}
+            <span className="text-dark-primary">{chip.label}</span>
+          </span>
         </Chip>
       ))}
 
