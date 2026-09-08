@@ -269,7 +269,7 @@ const SearchPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-16 rounded-cards py-12 md:flex-nowrap md:gap-8 md:bg-background-200 md:px-16">
             <div className="w-full shrink-0 md:w-[496px]">
               <SearchField
-                className="w-full"
+                className="w-full [&_.sk-form-input-addin]:gap-8 [&_.sk-form-input-addin]:px-8"
                 value={queryDraft}
                 onChange={(e) => setQueryDraft(e.target.value)}
                 onSearch={handleSearch}
