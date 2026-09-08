@@ -1,11 +1,4 @@
-import axios, {
-  AxiosError,
-  AxiosInstance,
-  AxiosRequestConfig,
-  AxiosHeaders,
-  AxiosResponse,
-  AxiosResponseHeaders,
-} from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosHeaders, AxiosResponse, AxiosResponseHeaders } from 'axios';
 import { randomUUID } from 'crypto';
 import { apiURL } from '@/config/api-config';
 import { CLIENT_KEY } from '@/config';
@@ -64,6 +57,24 @@ const errorDetail = (data: unknown): string => {
     if (typeof value === 'string' && value) return value;
   }
   return 'Internal server error';
+};
+
+const toHttpException = (error: unknown, label: string): HttpException => {
+  if (!axios.isAxiosError(error)) {
+    logger.error(`API request failed: ${label} => ${error instanceof Error ? error.message : 'unknown error'}`);
+    return new HttpException(500, 'Internal server error');
+  }
+
+  if (!error.response) {
+    const reason = error.code || 'network error';
+    logger.error(`API unreachable: ${label} => ${reason}`);
+    return new HttpException(502, `Could not reach the API (${reason})`);
+  }
+
+  const status = error.response.status;
+  const detail = errorDetail(error.response.data);
+  logger.error(`API request failed: ${label} => ${status}: ${detail}`);
+  return status === 404 ? new HttpException(404, 'Not found') : new HttpException(status, detail);
 };
 
 export class ApiService {
@@ -128,18 +139,7 @@ export class ApiService {
       const res = await this.send(preparedConfig, `${config.method} ${config.url}`);
       return { data: res.data, message: 'success' };
     } catch (error: unknown) {
-      if (!axios.isAxiosError(error)) {
-        throw new HttpException(500, 'Internal server error');
-      }
-
-      const status = (error as AxiosError).response?.status ?? 500;
-      const detail = errorDetail((error as AxiosError).response?.data);
-      logger.error(`API request failed: ${config.method} ${config.url} => ${status}: ${detail}`);
-
-      if (status === 404) {
-        throw new HttpException(404, 'Not found');
-      }
-      throw new HttpException(status, detail);
+      throw toHttpException(error, `${config.method} ${config.url}`);
     }
   }
 
@@ -162,13 +162,7 @@ export class ApiService {
     try {
       return await this.send(preparedConfig, `GET ${config.url}`);
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status ?? 500;
-        const detail = errorDetail(error.response?.data);
-        logger.error(`API stream request failed: GET ${config.url} => ${status}: ${detail}`);
-        throw new HttpException(status === 404 ? 404 : status, status === 404 ? 'Not found' : detail);
-      }
-      throw new HttpException(500, 'Internal server error');
+      throw toHttpException(error, `GET ${config.url} (stream)`);
     }
   }
 
