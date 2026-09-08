@@ -1,5 +1,6 @@
 export interface Film {
   filmId: number;
+  creator?: Creator | null;
   filename: string | null;
   objectFilePath: string | null;
   objectType: string | null;
@@ -20,6 +21,7 @@ export interface Film {
 
 export interface Publication {
   publicationId: number;
+  creator?: Creator | null;
   filename: string | null;
   publicationType: string | null;
   date: string | null;
@@ -53,6 +55,7 @@ export interface Audio {
 
 export interface Photo {
   photoId: number;
+  creator?: Creator | null;
   filename: string | null;
   documentTitle: string | null;
   subjectKeyword: string | null;
@@ -247,9 +250,19 @@ const buildPublicationFiles = (pub: Publication): DocumentFile[] | undefined => 
 const buildPhotoFiles = (photo: Photo): DocumentFile[] | undefined => {
   const files: DocumentFile[] = [];
   if (photo.largeImageFilename)
-    files.push({ filename: photo.largeImageFilename, format: 'Stor bild', size: '', variant: 'large' });
+    files.push({
+      filename: photo.largeImageFilename,
+      format: formatLabel(photo.largeImageFilename, 'Bild'),
+      size: '',
+      variant: 'large',
+    });
   if (photo.thumbnailFilename)
-    files.push({ filename: photo.thumbnailFilename, format: 'Miniatyr', size: '', variant: 'thumbnail' });
+    files.push({
+      filename: photo.thumbnailFilename,
+      format: formatLabel(photo.thumbnailFilename, 'Bild'),
+      size: '',
+      variant: 'thumbnail',
+    });
   return files.length > 0 ? files : undefined;
 };
 
@@ -271,6 +284,9 @@ const opt = (v: string | null | undefined): string | undefined => {
   return t.length > 0 ? t : undefined;
 };
 
+/** Originator name, whichever kind of party it is. */
+const creatorName = (creator: Creator | null | undefined): string => creator?.person || creator?.legalEntity || '';
+
 const isObject = (photo: Photo): boolean => (photo.objectType || '').trim().toLowerCase() === 'föremål';
 
 export const mapFilmToDocument = (film: Film): Document => ({
@@ -281,7 +297,7 @@ export const mapFilmToDocument = (film: Film): Document => ({
   ort: opt(film.locationText),
   plats: opt(film.location),
   location: pickLocation(film.location, film.locationText),
-  creator: '',
+  creator: creatorName(film.creator),
   description: film.comment || '',
   files: buildFilmFiles(film),
 });
@@ -301,7 +317,7 @@ export const mapPublicationToDocument = (pub: Publication): Document => {
     ort: opt(pub.locationText) || opt(pub.publisherLocation),
     plats: opt(pub.location),
     location: pickLocation(pub.location, pub.locationText, pub.publisherLocation),
-    creator: '',
+    creator: creatorName(pub.creator),
     description: pub.comment || '',
     publication: citation,
     source: citation
@@ -327,7 +343,7 @@ export const mapPhotoToDocument = (photo: Photo): Document => ({
   // The legacy site labels referenceCode or accessionNumber as the "Foto Id". Prefer the
   // explicit archive reference (referenceCode) and fall back to accessionNumber.
   accnr: opt(photo.referenceCode) || opt(photo.accessionNumber),
-  creator: '',
+  creator: creatorName(photo.creator),
   description: photoDescription(photo),
   source: photo.rights || undefined,
   files: buildPhotoFiles(photo),
@@ -375,10 +391,26 @@ export const mapAudiosToDocuments = (audios: Audio[]): Document[] => audios.map(
 const buildTextFiles = (text: Text): DocumentFile[] | undefined => {
   const files: DocumentFile[] = [];
   if (text.largeImageFilename)
-    files.push({ filename: text.largeImageFilename, format: 'Stor bild', size: '', variant: 'large' });
+    files.push({
+      filename: text.largeImageFilename,
+      format: formatLabel(text.largeImageFilename, 'Bild'),
+      size: '',
+      variant: 'large',
+    });
   if (text.thumbnailFilename)
-    files.push({ filename: text.thumbnailFilename, format: 'Miniatyr', size: '', variant: 'thumbnail' });
-  if (text.ocrFilename) files.push({ filename: text.ocrFilename, format: 'Text/XML', size: '', variant: 'text' });
+    files.push({
+      filename: text.thumbnailFilename,
+      format: formatLabel(text.thumbnailFilename, 'Bild'),
+      size: '',
+      variant: 'thumbnail',
+    });
+  if (text.ocrFilename)
+    files.push({
+      filename: text.ocrFilename,
+      format: formatLabel(text.ocrFilename, 'Text'),
+      size: '',
+      variant: 'text',
+    });
   return files.length > 0 ? files : undefined;
 };
 
@@ -456,7 +488,7 @@ export interface PagedTextResponse {
 // more. Media, descriptions and per-type metadata only exist on the detail
 // endpoints, which `/documents/:id` still uses.
 
-export interface CombinedObjectCreator {
+export interface Creator {
   personId?: number | null;
   person?: string | null;
   legalEntityId?: number | null;
@@ -477,7 +509,7 @@ export interface CombinedObject {
   locationText: string | null;
   /** Resolved place name from TOPOGRAFI, preferred over locationText. */
   location: string | null;
-  creator?: CombinedObjectCreator | null;
+  creator?: Creator | null;
 }
 
 export interface TypeCount {
@@ -522,9 +554,6 @@ export const normalizeObjectKey = (objectKey: string): string => {
   if (objectKey.startsWith('ljud-')) return `audio-${objectKey.slice('ljud-'.length)}`;
   return objectKey;
 };
-
-const creatorName = (creator: CombinedObjectCreator | null | undefined): string =>
-  creator?.person || creator?.legalEntity || '';
 
 export const mapCombinedObjectToDocument = (obj: CombinedObject): Document => ({
   id: normalizeObjectKey(obj.objectKey),

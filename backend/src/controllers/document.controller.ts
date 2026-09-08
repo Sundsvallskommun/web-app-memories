@@ -67,7 +67,10 @@ const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
 const countFor = (typeCounts: TypeCount[] | undefined, objectType: string): number =>
   typeCounts?.find(c => c.objectType === objectType)?.count ?? 0;
 
-const FILE_CACHE_CONTROL = 'public, max-age=86400';
+const FALLBACK_FILE_CACHE_CONTROL = 'public, max-age=86400';
+
+const fileCacheControl = (upstream: string | undefined): string =>
+  upstream && !/no-store|no-cache/i.test(upstream) ? upstream : FALLBACK_FILE_CACHE_CONTROL;
 
 // ============================================================================
 
@@ -243,7 +246,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
-    response.setHeader('Cache-Control', FILE_CACHE_CONTROL);
+    response.setHeader('Cache-Control', fileCacheControl(upstream.headers['cache-control'] as string | undefined));
     // Preserve 206 when upstream serves a partial response.
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
@@ -285,7 +288,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
-    response.setHeader('Cache-Control', FILE_CACHE_CONTROL);
+    response.setHeader('Cache-Control', fileCacheControl(upstream.headers['cache-control'] as string | undefined));
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
     return response;
@@ -325,7 +328,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
-    response.setHeader('Cache-Control', FILE_CACHE_CONTROL);
+    response.setHeader('Cache-Control', fileCacheControl(upstream.headers['cache-control'] as string | undefined));
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
     return response;
