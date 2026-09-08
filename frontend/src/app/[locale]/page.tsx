@@ -263,7 +263,7 @@ const SearchPage: React.FC = () => {
   return (
     <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
       <Main>
-        <div className="flex flex-col gap-sm">
+        <div className="flex flex-col gap-md">
           <h1 className="sr-only">Sök i Sundsvallsminnen</h1>
 
           <div className="flex flex-wrap items-center gap-16 rounded-cards py-12 md:flex-nowrap md:gap-8 md:bg-background-200 md:px-16">
