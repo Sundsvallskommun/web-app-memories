@@ -1,27 +1,16 @@
 'use client';
 
-import { CookieConsent, Footer, Header, Link } from '@sk-web-gui/react';
+import { Header, Link } from '@sk-web-gui/react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
+import { AppFooter } from '@layouts/app-footer/app-footer.component';
 
 interface DefaultLayoutProps {
   children: React.ReactNode;
-  headerTitle?: string;
-  headerSubtitle?: string;
-  preContent?: React.ReactNode;
-  postContent?: React.ReactNode;
-  logoLinkHref?: string;
 }
 
-export default function DefaultLayout({
-  headerTitle,
-  headerSubtitle,
-  children,
-  preContent = undefined,
-  postContent = undefined,
-  logoLinkHref = '/',
-}: DefaultLayoutProps) {
+export default function DefaultLayout({ children }: DefaultLayoutProps) {
   const router = useRouter();
   const { t } = useTranslation();
 
@@ -31,8 +20,11 @@ export default function DefaultLayout({
   };
 
   const handleLogoClick = () => {
-    router.push(logoLinkHref);
+    router.push('/');
   };
+
+  const title = process.env.NEXT_PUBLIC_APP_NAME;
+  const subtitle = t('layout:header.subtitle');
 
   return (
     <div className="DefaultLayout full-page-layout">
@@ -49,58 +41,17 @@ export default function DefaultLayout({
 
       <Header
         data-cy="nav-header"
-        title={headerTitle ? headerTitle : process.env.NEXT_PUBLIC_APP_NAME}
-        subtitle={headerSubtitle ? headerSubtitle : ''}
-        aria-label={`${headerTitle ? headerTitle : process.env.NEXT_PUBLIC_APP_NAME} ${headerSubtitle}`}
+        title={title}
+        subtitle={subtitle}
+        aria-label={`${title} ${subtitle}`}
         logoLinkOnClick={handleLogoClick}
       />
-
-      {preContent && preContent}
 
       <div className={`main-container flex-grow relative w-full flex flex-col`}>
         <div className="main-content-padding">{children}</div>
       </div>
 
-      {postContent && postContent}
-
-      <Footer></Footer>
-
-      <CookieConsent
-        title={t('layout:cookies.title', { app: process.env.NEXT_PUBLIC_APP_NAME })}
-        body={
-          <p>
-            {t('layout:cookies.description')}{' '}
-            <NextLink href="/kakor" passHref legacyBehavior>
-              <Link>{t('layout:cookies.read_more')}</Link>
-            </NextLink>
-          </p>
-        }
-        cookies={[
-          {
-            optional: false,
-            displayName: t('layout:cookies.necessary.displayName'),
-            description: t('layout:cookies.necessary.description'),
-            cookieName: 'necessary',
-          },
-          {
-            optional: true,
-            displayName: t('layout:cookies.func.displayName'),
-            description: t('layout:cookies.func.description'),
-            cookieName: 'func',
-          },
-          {
-            optional: true,
-            displayName: t('layout:cookies.stats.displayName'),
-            description: t('layout:cookies.stats.description'),
-            cookieName: 'stats',
-          },
-        ]}
-        resetConsentOnInit={false}
-        onConsent={() => {
-          // FIXME: do stuff with cookies?
-          // NO ANO FUNCTIONS
-        }}
-      />
+      <AppFooter />
     </div>
   );
 }

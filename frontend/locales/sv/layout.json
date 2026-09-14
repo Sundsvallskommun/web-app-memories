@@ -1,22 +1,37 @@
 {
   "header": {
-    "goto_content": "Hoppa till innehåll"
+    "goto_content": "Hoppa till innehåll",
+    "subtitle": "Sök i arkivets databas"
   },
-  "cookies": {
-    "title": "Kakor på {{app}}",
-    "description": "Vi använder kakor, cookies, för att ge dig en förbättrad upplevelse, sammanställa statistik och för att viss nödvändig funktionalitet ska fungera på webbplatsen.",
-    "read_more": "Läs mer om hur vi använder kakor",
-    "necessary": {
-      "displayName": "Nödvändiga kakor",
-      "description": "Dessa kakor är nödvändiga för att webbplatsen ska fungera och kan inte stängas av i våra system."
+  "footer": {
+    "title": "Sundsvallsminnen",
+    "directions": "Resa hit",
+    "contact_us": "Kontakta oss",
+    "contact": {
+      "heading": "Kontakt",
+      "address": "Norrmalmsgatan 4, 853 85 Sundsvall",
+      "email": "kontakt@sundsvall.se",
+      "phone": "060-123 45 67",
+      "opening_hours": "Mån–fre 09.00–16.00",
+      "more": "Fler kontaktvägar och öppettider",
+      "phone_label": "Telefon",
+      "email_label": "E-postadress",
+      "address_label": "Besöksadress",
+      "opening_hours_label": "Öppettider"
     },
-    "func": {
-      "displayName": "Funktionella kakor",
-      "description": "Dessa kakor ger förbättrade funktioner på webbplatsen."
+    "about": {
+      "heading": "Om innehållet",
+      "site": "Om webbplatsen",
+      "accessibility": "Tillgänglighetsredogörelse",
+      "personal_data": "Behandling av personuppgifter",
+      "cookies": "Om kakor (cookies)"
     },
-    "stats": {
-      "displayName": "Kakor för statistik",
-      "description": "Dessa kakor tillåter oss att räkna besök och trafikkällor, så att vi kan mäta och förbättra prestanda på vår webbplats."
+    "social": {
+      "heading": "Följ oss",
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "linkedin": "LinkedIn",
+      "youtube": "Youtube"
     }
   }
 }
