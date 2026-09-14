@@ -37,7 +37,7 @@ import {
 // could only produce accurate totals by fetching everything first.
 
 /** Upstream sort fields. Anything else is dropped rather than substituted. */
-const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType']);
+const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType', 'location']);
 
 const toUpstreamSort = (sortBy: string | undefined): string | undefined =>
   sortBy && SORTABLE.has(sortBy) ? sortBy : undefined;
@@ -106,6 +106,7 @@ export class DocumentController {
     @QueryParam('yearFrom') yearFrom: number,
     @QueryParam('yearTo') yearTo: number,
     @QueryParam('location') location: string,
+    @QueryParam('place') place: string,
     @QueryParam('creator') creator: string,
     @QueryParam('gender') gender: string,
     @QueryParam('organisation') organisation: string,
@@ -129,6 +130,10 @@ export class DocumentController {
     if (yearFrom) params.set('yearFrom', String(yearFrom));
     if (yearTo) params.set('yearTo', String(yearTo));
     if (location?.trim()) params.set('location', location.trim());
+
+    for (const id of (place ?? '').split(',').map(value => value.trim())) {
+      if (/^\d+$/.test(id)) params.append('topographyId', id);
+    }
     if (creator?.trim()) params.set('creator', creator.trim());
     // Only the person registers record a gender, so this also excludes every
     // document type and all 116k seamen, who have no such column upstream.
