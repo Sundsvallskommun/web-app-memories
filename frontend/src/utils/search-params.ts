@@ -1,7 +1,7 @@
 import { DocumentType } from '@data-contracts/document';
 import { ALL_TYPES } from '@utils/filter-state';
 
-export const SORT_KEYS = ['year', 'title', 'objectType'] as const;
+export const SORT_KEYS = ['year', 'title', 'objectType', 'location'] as const;
 
 export type SortBy = (typeof SORT_KEYS)[number];
 export type SortDirection = 'asc' | 'desc';

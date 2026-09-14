@@ -1,5 +1,14 @@
 /** The six types that carry documents, plus the registers, which are searchable too. */
-export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object' | 'Audio' | 'Text' | 'Person' | 'Census' | 'Seaman';
+export type DocumentType =
+  | 'Film'
+  | 'Publication'
+  | 'Photo'
+  | 'Object'
+  | 'Audio'
+  | 'Text'
+  | 'Person'
+  | 'Census'
+  | 'Seaman';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Film: 'Film',
@@ -83,7 +92,7 @@ export interface SearchParams {
   /** Names of organisation categories, each standing for the organisations in it. */
   categories?: string[];
   // Constrained to the fields the combined search can sort on.
-  sortBy?: 'year' | 'title' | 'objectType';
+  sortBy?: 'year' | 'title' | 'objectType' | 'location';
   sortDirection?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;

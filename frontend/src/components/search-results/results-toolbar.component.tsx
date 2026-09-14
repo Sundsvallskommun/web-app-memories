@@ -18,8 +18,7 @@ const SORT_OPTIONS: SortOption[] = [
   { value: 'year-desc', label: 'Nyast först', sortBy: 'year', sortDirection: 'desc' },
   { value: 'year-asc', label: 'Äldst först', sortBy: 'year', sortDirection: 'asc' },
   { value: 'title-asc', label: 'Titel / Namn A-Ö', sortBy: 'title', sortDirection: 'asc' },
-  // Awaiting `location` in the API's sortBy. The field is on the record already.
-  { value: 'plats', label: 'Plats (kommer senare)', disabled: true },
+  { value: 'location-asc', label: 'Plats A-Ö', sortBy: 'location', sortDirection: 'asc' },
   { value: 'objectType-asc', label: 'Kategori', sortBy: 'objectType', sortDirection: 'asc' },
 ];
 
