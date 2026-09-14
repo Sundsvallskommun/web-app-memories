@@ -46,7 +46,7 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
           key: 'period',
           filter: 'Tidsperiod',
           label: periodLabel,
-          clear: () => onChange(setPeriod(filters, undefined, undefined)),
+          clear: () => onChange(setPeriod(filters)),
         },
       ]
     : []),
@@ -71,7 +71,7 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
         key: filter,
         filter: SCOPED_LABELS[filter],
         label: filters[filter] as string,
-        clear: () => onChange(setScoped(filters, filter, undefined)),
+        clear: () => onChange(setScoped(filters, filter)),
       })),
 
     ...filters.organisations.map((organisation) => ({

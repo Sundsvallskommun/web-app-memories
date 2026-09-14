@@ -34,7 +34,7 @@ export const FilterOverflowRow: React.FC<Props> = ({ items, className }) => {
         moreWidth.current = ghostRef.current?.getBoundingClientRect().width ?? 0;
       }
 
-      const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0;
       const available = row.clientWidth;
 
       let used = 0;

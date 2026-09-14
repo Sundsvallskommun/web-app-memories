@@ -38,7 +38,7 @@ export class LegalEntityController {
   @Get('/organisations')
   async searchOrganisations(
     @QueryParam('name') name: string,
-    @QueryParam('limit') limit: number = MAX_RESULTS,
+    @QueryParam('limit') limit: number,
     @Res() response: Response,
   ) {
     const trimmed = name?.trim();
@@ -50,7 +50,7 @@ export class LegalEntityController {
 
     const params = new URLSearchParams({
       page: '1',
-      limit: String(Math.min(Math.max(1, limit), 100)),
+      limit: String(Math.min(Math.max(1, limit || MAX_RESULTS), 100)),
       sortBy: 'name',
       sortDirection: 'ASC',
       name: trimmed,

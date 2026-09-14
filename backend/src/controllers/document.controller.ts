@@ -77,6 +77,29 @@ const GENDERED_OBJECT_TYPES = ['Person', 'Mantal'];
 const countFor = (typeCounts: TypeCount[] | undefined, objectType: string): number =>
   typeCounts?.find(c => c.objectType === objectType)?.count ?? 0;
 
+/** Appends each numeric id in a comma-separated list, so several values widen the search. */
+const appendIds = (params: URLSearchParams, key: string, ids: string | undefined): void => {
+  for (const id of (ids ?? '').split(',').map(value => value.trim())) {
+    if (/^\d+$/.test(id)) params.append(key, id);
+  }
+};
+
+const upstreamObjectTypes = (type: string | undefined, gender: string | undefined): string[] => {
+  const requested = [
+    ...new Set(
+      (type ?? '')
+        .split(',')
+        .map(name => DOCUMENT_TYPE_TO_OBJECT_TYPE[name.trim()])
+        .filter(Boolean),
+    ),
+  ];
+  if (requested.length > 0) return requested;
+
+  // Only Person and Mantal record a gender, so falling back to the document
+  // types would make a gender filter on its own return nothing at all.
+  return gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
+};
+
 const FALLBACK_FILE_CACHE_CONTROL = 'public, max-age=86400';
 
 const fileCacheControl = (upstream: string | undefined): string =>
@@ -128,35 +151,15 @@ export class DocumentController {
     if (yearFrom) params.set('yearFrom', String(yearFrom));
     if (yearTo) params.set('yearTo', String(yearTo));
 
-    for (const id of (place ?? '').split(',').map(value => value.trim())) {
-      if (/^\d+$/.test(id)) params.append('topographyId', id);
-    }
+    appendIds(params, 'topographyId', place);
     if (creator?.trim()) params.set('creator', creator.trim());
     // Only the person registers record a gender, so this also excludes every
     // document type and all 116k seamen, who have no such column upstream.
     if (gender?.trim()) params.set('gender', gender.trim());
+    appendIds(params, 'creatorLegalEntityId', organisation);
+    appendIds(params, 'categoryId', category);
 
-    for (const id of (organisation ?? '').split(',').map(value => value.trim())) {
-      if (/^\d+$/.test(id)) params.append('creatorLegalEntityId', id);
-    }
-    for (const id of (category ?? '').split(',').map(value => value.trim())) {
-      if (/^\d+$/.test(id)) params.append('categoryId', id);
-    }
-
-    const requestedObjectTypes = [
-      ...new Set(
-        (type ?? '')
-          .split(',')
-          .map(name => DOCUMENT_TYPE_TO_OBJECT_TYPE[name.trim()])
-          .filter(Boolean),
-      ),
-    ];
-
-    // Only Person and Mantal record a gender, so falling back to the document
-    // types would make a gender filter on its own return nothing at all.
-    const defaultObjectTypes = gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
-
-    for (const objectType of requestedObjectTypes.length > 0 ? requestedObjectTypes : defaultObjectTypes) {
+    for (const objectType of upstreamObjectTypes(type, gender)) {
       params.append('objectType', objectType);
     }
 
