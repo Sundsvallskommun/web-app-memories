@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import DefaultLayout from '@layouts/default-layout/default-layout.component';
 import Main from '@layouts/main/main.component';
 import { SearchField } from '@sk-web-gui/react';
-import { DocumentType, SearchParams, SearchResult } from '@data-contracts/document';
+import { Category, DocumentType, SearchParams, SearchResult } from '@data-contracts/document';
 import { ActiveFilterChips } from '@components/search-filters/active-filter-chips.component';
 import { ResultsToolbar } from '@components/search-results/results-toolbar.component';
 import { SearchResults } from '@components/search-results/search-results.component';
@@ -51,15 +51,15 @@ const SearchPage: React.FC = () => {
     ),
   ];
   const organisationIdsKey = organisationIds.join(',');
-  const categories = [
+  const categoryIds = [
     ...new Set(
       (urlParams.get('category') ?? '')
         .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean)
+        .map((value) => Number(value.trim()))
+        .filter((id) => Number.isInteger(id) && id > 0)
     ),
   ];
-  const categoriesKey = categories.join(',');
+  const categoryIdsKey = categoryIds.join(',');
   const genderParam = urlParams.get('gender')?.trim();
   const gender = genderParam && GENDERS.includes(genderParam) ? genderParam : undefined;
 
@@ -96,6 +96,12 @@ const SearchPage: React.FC = () => {
     name: knownOrganisations[id] ?? String(id),
   }));
 
+  const [knownCategories, setKnownCategories] = useState<Record<number, string>>({});
+  const selectedCategories: Category[] = categoryIds.map((id) => ({
+    id,
+    name: knownCategories[id] ?? String(id),
+  }));
+
   /** Everything the filters hold right now, as one value the rules can work on. */
   const currentFilters: FilterState = {
     types: selectedTypes,
@@ -105,7 +111,7 @@ const SearchPage: React.FC = () => {
     creator,
     gender,
     organisations: selectedOrganisations,
-    categories,
+    categories: selectedCategories,
   };
 
   const [failed, setFailed] = useState(false);
@@ -161,7 +167,7 @@ const SearchPage: React.FC = () => {
         creator,
         gender,
         organisationIds,
-        categories,
+        categoryIds,
         sortBy,
         sortDirection,
         page,
@@ -177,7 +183,7 @@ const SearchPage: React.FC = () => {
       creator,
       gender,
       organisationIdsKey,
-      categoriesKey,
+      categoryIdsKey,
       sortBy,
       sortDirection,
       page,
@@ -196,7 +202,7 @@ const SearchPage: React.FC = () => {
       creator,
       gender,
       organisations: organisationIds,
-      categories,
+      categories: categoryIds,
       sortBy,
       sortDirection,
       page,
@@ -206,7 +212,12 @@ const SearchPage: React.FC = () => {
     setFailed(false);
     searchDocuments(params)
       .then((res) => {
-        if (!cancelled) setResult(res);
+        if (cancelled) return;
+        setResult(res);
+        setKnownCategories((previous) => ({
+          ...previous,
+          ...Object.fromEntries(res.categoryCounts.map((category) => [category.id, category.name])),
+        }));
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -230,6 +241,10 @@ const SearchPage: React.FC = () => {
     setKnownOrganisations((previous) => ({
       ...previous,
       ...Object.fromEntries(next.organisations.map((one) => [one.id, one.name])),
+    }));
+    setKnownCategories((previous) => ({
+      ...previous,
+      ...Object.fromEntries(next.categories.map((one) => [one.id, one.name])),
     }));
     updateUrl(filterParams(next));
   };
@@ -282,7 +297,12 @@ const SearchPage: React.FC = () => {
               />
             </div>
 
-            <SearchFilterBar filters={currentFilters} countFor={getTypeCount} onChange={applyState} />
+            <SearchFilterBar
+              filters={currentFilters}
+              countFor={getTypeCount}
+              categoryCounts={result?.categoryCounts ?? []}
+              onChange={applyState}
+            />
           </div>
 
           <ActiveFilterChips filters={currentFilters} onChange={applyState} />

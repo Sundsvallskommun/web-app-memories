@@ -1,4 +1,4 @@
-import { DocumentType } from '@data-contracts/document';
+import { Category, DocumentType } from '@data-contracts/document';
 import { Organisation } from '@services/organisation-service';
 
 export const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
@@ -29,7 +29,7 @@ export interface FilterState {
   creator?: string;
   gender?: string;
   organisations: Organisation[];
-  categories: string[];
+  categories: Category[];
 }
 
 export const EMPTY_FILTERS: FilterState = { types: [], organisations: [], categories: [] };
@@ -81,9 +81,10 @@ export const toggleOrganisation = (state: FilterState, organisation: Organisatio
   return { ...state, organisations, types: organisations.length > 0 ? kept : state.types };
 };
 
-export const toggleCategory = (state: FilterState, category: string): FilterState => {
-  const on = state.categories.includes(category);
-  const categories = on ? state.categories.filter((one) => one !== category) : [...state.categories, category];
+export const toggleCategory = (state: FilterState, category: Category): FilterState => {
+  const on = state.categories.some((chosen) => chosen.id === category.id);
+  const categories =
+    on ? state.categories.filter((chosen) => chosen.id !== category.id) : [...state.categories, category];
 
   const kept = state.types.filter((type) => TYPES_SUPPORTING.category.includes(type));
   return { ...state, categories, types: categories.length > 0 ? kept : state.types };
@@ -104,5 +105,5 @@ export const filterParams = (state: FilterState): Record<string, string | undefi
   creator: state.creator,
   gender: state.gender,
   org: state.organisations.length > 0 ? state.organisations.map((one) => one.id).join(',') : undefined,
-  category: state.categories.length > 0 ? state.categories.join(',') : undefined,
+  category: state.categories.length > 0 ? state.categories.map((one) => one.id).join(',') : undefined,
 });

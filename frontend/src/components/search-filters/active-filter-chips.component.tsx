@@ -75,9 +75,9 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
     })),
 
     ...filters.categories.map((category) => ({
-      key: `category-${category}`,
+      key: `category-${category.id}`,
       filter: 'Verksamhetskategori',
-      label: category,
+      label: category.name,
       clear: () => onChange(toggleCategory(filters, category)),
     })),
   ];

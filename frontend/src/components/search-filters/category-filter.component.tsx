@@ -1,78 +1,44 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Filter, PopupMenu, Spinner } from '@sk-web-gui/react';
+import { Filter, PopupMenu } from '@sk-web-gui/react';
 import { ChevronDown } from 'lucide-react';
 import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-alignment';
-import { OrganisationCategory, getOrganisationCategories } from '@services/organisation-service';
-
-/** The archive accepts 200 creatorLegalEntityId values in one search, 201 is a 400. */
-const MAX_ORGANISATIONS = 200;
+import { Category, CategoryCount } from '@data-contracts/document';
 
 interface Props {
-  selected: string[];
-  onToggle: (category: string) => void;
+  /** The categories with hits in the current search. */
+  counts: CategoryCount[];
+  selected: Category[];
+  onToggle: (category: Category) => void;
 }
 
-export const CategoryFilterBody: React.FC<Props> = ({ selected, onToggle }) => {
-  const [categories, setCategories] = useState<OrganisationCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+export const CategoryFilterBody: React.FC<Props> = ({ counts, selected, onToggle }) => {
+  const withHits = counts.filter((category) => category.count > 0);
+  const options = [
+    ...withHits,
+    ...selected.filter((chosen) => !withHits.some((category) => category.id === chosen.id)),
+  ];
 
-  useEffect(() => {
-    let cancelled = false;
-
-    getOrganisationCategories()
-      .then((found) => {
-        if (!cancelled) setCategories(found);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (loading) {
+  if (options.length === 0) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner size={3} />
-      </div>
+      <p className="text-label-small text-dark-secondary p-16">Inga kategorier har träffar i den här sökningen.</p>
     );
   }
 
-  if (failed || categories.length === 0) {
-    return <p className="text-label-small text-dark-secondary p-16">Kategorierna kunde inte hämtas.</p>;
-  }
-
   return (
-    <>
-      <Filter data-cy="category-filter-list" className={CHECKBOX_ALIGNMENT_CLASS}>
-        <Filter.Label className="sr-only">Filtrera på verksamhetskategori</Filter.Label>
-        {categories.map((category) => (
-          <Filter.Item
-            key={category.name}
-            checked={selected.includes(category.name)}
-            disabled={!category.supported}
-            labelPosition="left"
-            onChange={() => onToggle(category.name)}
-          >
-            {`${category.name} (${category.count})`}
-          </Filter.Item>
-        ))}
-      </Filter>
-
-      <p className="text-label-small text-dark-secondary px-16 pb-8">
-        Siffran är antalet organisationer i kategorin, inte antalet träffar.
-        {categories.some((category) => !category.supported) &&
-          ` De gråmarkerade har fler än ${MAX_ORGANISATIONS} organisationer, vilket är så många arkivet kan söka på samtidigt.`}
-      </p>
-    </>
+    <Filter data-cy="category-filter-list" className={CHECKBOX_ALIGNMENT_CLASS}>
+      <Filter.Label className="sr-only">Filtrera på verksamhetskategori</Filter.Label>
+      {options.map((category) => (
+        <Filter.Item
+          key={category.id}
+          checked={selected.some((chosen) => chosen.id === category.id)}
+          labelPosition="left"
+          onChange={() => onToggle({ id: category.id, name: category.name })}
+        >
+          {'count' in category ? `${category.name} (${category.count})` : category.name}
+        </Filter.Item>
+      ))}
+    </Filter>
   );
 };
 
