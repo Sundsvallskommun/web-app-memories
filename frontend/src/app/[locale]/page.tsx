@@ -13,6 +13,7 @@ import { GENDERS } from '@components/search-filters/person-filter.component';
 import { SearchFilterBar } from '@components/search-filters/search-filter-bar.component';
 import { searchDocuments } from '@services/document-service';
 import { Organisation, getOrganisation } from '@services/organisation-service';
+import { Place, getPlaces } from '@services/place-service';
 import {
   DEFAULT_PAGE_SIZE,
   SortBy,
@@ -40,7 +41,15 @@ const SearchPage: React.FC = () => {
   const pageSize = parseSize(urlParams.get('size'));
   const yearFrom = parseYear(urlParams.get('from'));
   const yearTo = parseYear(urlParams.get('to'));
-  const location = urlParams.get('location')?.trim() || undefined;
+  const placeIds = [
+    ...new Set(
+      (urlParams.get('place') ?? '')
+        .split(',')
+        .map((value) => Number(value.trim()))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    ),
+  ];
+  const placeIdsKey = placeIds.join(',');
   const creator = urlParams.get('creator')?.trim() || undefined;
   const organisationIds = [
     ...new Set(
@@ -96,6 +105,28 @@ const SearchPage: React.FC = () => {
     name: knownOrganisations[id] ?? String(id),
   }));
 
+  const [knownPlaces, setKnownPlaces] = useState<Record<number, string>>({});
+  const hasUnnamedPlace = placeIds.some((id) => !knownPlaces[id]);
+  useEffect(() => {
+    if (!hasUnnamedPlace) return;
+    let cancelled = false;
+
+    getPlaces()
+      .then((places) => {
+        if (!cancelled) setKnownPlaces(Object.fromEntries(places.map((place) => [place.id, place.name])));
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasUnnamedPlace]);
+
+  const selectedPlaces: Place[] = placeIds.map((id) => ({
+    id,
+    name: knownPlaces[id] ?? String(id),
+  }));
+
   const [knownCategories, setKnownCategories] = useState<Record<number, string>>({});
   const selectedCategories: Category[] = categoryIds.map((id) => ({
     id,
@@ -107,7 +138,7 @@ const SearchPage: React.FC = () => {
     types: selectedTypes,
     yearFrom,
     yearTo,
-    location,
+    places: selectedPlaces,
     creator,
     gender,
     organisations: selectedOrganisations,
@@ -135,7 +166,7 @@ const SearchPage: React.FC = () => {
           'q' in patch ||
           'from' in patch ||
           'to' in patch ||
-          'location' in patch ||
+          'place' in patch ||
           'creator' in patch ||
           'gender' in patch ||
           'org' in patch ||
@@ -163,7 +194,7 @@ const SearchPage: React.FC = () => {
         selectedTypes,
         yearFrom,
         yearTo,
-        location,
+        placeIds,
         creator,
         gender,
         organisationIds,
@@ -179,7 +210,7 @@ const SearchPage: React.FC = () => {
       selectedTypes,
       yearFrom,
       yearTo,
-      location,
+      placeIdsKey,
       creator,
       gender,
       organisationIdsKey,
@@ -198,7 +229,7 @@ const SearchPage: React.FC = () => {
       types: selectedTypes,
       yearFrom,
       yearTo,
-      location,
+      places: placeIds,
       creator,
       gender,
       organisations: organisationIds,
@@ -245,6 +276,10 @@ const SearchPage: React.FC = () => {
     setKnownCategories((previous) => ({
       ...previous,
       ...Object.fromEntries(next.categories.map((one) => [one.id, one.name])),
+    }));
+    setKnownPlaces((previous) => ({
+      ...previous,
+      ...Object.fromEntries(next.places.map((one) => [one.id, one.name])),
     }));
     updateUrl(filterParams(next));
   };

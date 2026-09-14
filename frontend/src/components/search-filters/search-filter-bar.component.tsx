@@ -10,6 +10,7 @@ import { FilterItem, FilterOverflowRow } from '@components/search-filters/filter
 import { OrganisationFilter, OrganisationFilterBody } from '@components/search-filters/organisation-filter.component';
 import { PeriodFilter, PeriodFilterBody } from '@components/search-filters/period-filter.component';
 import { PersonFilter, PersonFilterBody } from '@components/search-filters/person-filter.component';
+import { PlaceFilter, PlaceFilterBody } from '@components/search-filters/place-filter.component';
 import { TextFilter, TextFilterBody } from '@components/search-filters/text-filter.component';
 import { TypeFilter, TypeFilterBody } from '@components/search-filters/type-filter.component';
 import {
@@ -22,6 +23,7 @@ import {
   toggleAllRegisters,
   toggleCategory,
   toggleOrganisation,
+  togglePlace,
   toggleType,
 } from '@utils/filter-state';
 import { periodLabelFor } from '@utils/search-params';
@@ -81,17 +83,8 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCo
       ),
     },
     {
-      key: 'location',
-      node: (
-        <TextFilter
-          label="Plats"
-          placeholder="Skriv en plats"
-          applyLabel="Visa plats"
-          value={filters.location}
-          onApply={(next) => onChange(setScoped(filters, 'location', next))}
-          data-cy="place-filter"
-        />
-      ),
+      key: 'place',
+      node: <PlaceFilter selected={filters.places} onToggle={(place) => onChange(togglePlace(filters, place))} />,
     },
     {
       key: 'creator',
@@ -162,19 +155,11 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCo
       ),
     },
     {
-      key: 'location',
+      key: 'place',
       label: 'Plats',
-      summary: draft.location ?? NOTHING,
+      summary: draft.places.map((place) => place.name).join(', ') || NOTHING,
       body: (
-        <TextFilterBody
-          label="Plats"
-          placeholder="Skriv en plats"
-          applyLabel="Visa plats"
-          value={draft.location}
-          onApply={(next) => setDraft(setScoped(draft, 'location', next))}
-          autoApply
-          data-cy="place-filter"
-        />
+        <PlaceFilterBody selected={draft.places} onToggle={(place) => setDraft(togglePlace(draft, place))} hideLabel />
       ),
     },
     {

@@ -92,7 +92,8 @@ export interface SearchParams {
   types?: DocumentType[];
   yearFrom?: number;
   yearTo?: number;
-  location?: string;
+  /** Ids of places in the topography register. Several are alternatives, so they widen. */
+  places?: number[];
   /** Free-text originator, matching both persons and organisations. */
   creator?: string;
   /** One of Man, Kvinna or Okänt. Only the person registers record one. */

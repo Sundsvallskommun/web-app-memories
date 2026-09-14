@@ -10,6 +10,7 @@ import {
   setScoped,
   toggleCategory,
   toggleOrganisation,
+  togglePlace,
   toggleType,
 } from '@utils/filter-state';
 import { periodLabelFor } from '@utils/search-params';
@@ -22,7 +23,6 @@ interface ActiveChip {
 }
 
 const SCOPED_LABELS: Record<ScopedFilter, string> = {
-  location: 'Plats',
   creator: 'Upphovsperson',
   gender: 'Kön',
 };
@@ -56,6 +56,13 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
       filter: 'Typ',
       label: DOCUMENT_TYPE_LABELS[type],
       clear: () => onChange(toggleType(filters, type)),
+    })),
+
+    ...filters.places.map((place) => ({
+      key: `place-${place.id}`,
+      filter: 'Plats',
+      label: place.name,
+      clear: () => onChange(togglePlace(filters, place)),
     })),
 
     ...scopedFilters
