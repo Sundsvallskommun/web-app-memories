@@ -104,7 +104,6 @@ export class DocumentController {
     @QueryParam('sortDirection') sortDirection: string,
     @QueryParam('yearFrom') yearFrom: number,
     @QueryParam('yearTo') yearTo: number,
-    @QueryParam('location') location: string,
     @QueryParam('place') place: string,
     @QueryParam('creator') creator: string,
     @QueryParam('gender') gender: string,
@@ -128,7 +127,6 @@ export class DocumentController {
     if (trimmedQuery) params.set('query', trimmedQuery);
     if (yearFrom) params.set('yearFrom', String(yearFrom));
     if (yearTo) params.set('yearTo', String(yearTo));
-    if (location?.trim()) params.set('location', location.trim());
 
     for (const id of (place ?? '').split(',').map(value => value.trim())) {
       if (/^\d+$/.test(id)) params.append('topographyId', id);
