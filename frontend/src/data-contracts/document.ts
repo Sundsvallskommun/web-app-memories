@@ -77,20 +77,31 @@ export interface Document {
   relatedIds?: string[];
 }
 
+/** A category the creating organisations are grouped into, Verksamhetskategori. */
+export interface Category {
+  id: number;
+  name: string;
+}
+
+export interface CategoryCount extends Category {
+  count: number;
+}
+
 export interface SearchParams {
   query?: string;
   types?: DocumentType[];
   yearFrom?: number;
   yearTo?: number;
-  location?: string;
+  /** Ids of places in the topography register. Several are alternatives, so they widen. */
+  places?: number[];
   /** Free-text originator, matching both persons and organisations. */
   creator?: string;
   /** One of Man, Kvinna or Okänt. Only the person registers record one. */
   gender?: string;
   /** Ids of creating organisations. Several are alternatives, so they widen. */
   organisations?: number[];
-  /** Names of organisation categories, each standing for the organisations in it. */
-  categories?: string[];
+  /** Ids of organisation categories. Several are alternatives, so they widen. */
+  categories?: number[];
   // Constrained to the fields the combined search can sort on.
   sortBy?: 'year' | 'title' | 'objectType' | 'location';
   sortDirection?: 'asc' | 'desc';
@@ -113,4 +124,5 @@ export interface SearchResult {
   personTotal: number;
   censusTotal: number;
   seamanTotal: number;
+  categoryCounts: CategoryCount[];
 }

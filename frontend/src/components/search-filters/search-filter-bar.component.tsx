@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { Button } from '@sk-web-gui/react';
 import { ListFilter } from 'lucide-react';
-import { DOCUMENT_TYPE_LABELS, DocumentType } from '@data-contracts/document';
+import { CategoryCount, DOCUMENT_TYPE_LABELS, DocumentType } from '@data-contracts/document';
 import { FilterModal, FilterRow } from '@components/search-filters/filter-modal.component';
 import { CategoryFilter, CategoryFilterBody } from '@components/search-filters/category-filter.component';
 import { FilterItem, FilterOverflowRow } from '@components/search-filters/filter-overflow-row.component';
 import { OrganisationFilter, OrganisationFilterBody } from '@components/search-filters/organisation-filter.component';
 import { PeriodFilter, PeriodFilterBody } from '@components/search-filters/period-filter.component';
 import { PersonFilter, PersonFilterBody } from '@components/search-filters/person-filter.component';
+import { PlaceFilter, PlaceFilterBody } from '@components/search-filters/place-filter.component';
 import { TextFilter, TextFilterBody } from '@components/search-filters/text-filter.component';
 import { TypeFilter, TypeFilterBody } from '@components/search-filters/type-filter.component';
 import {
@@ -22,6 +23,7 @@ import {
   toggleAllRegisters,
   toggleCategory,
   toggleOrganisation,
+  togglePlace,
   toggleType,
 } from '@utils/filter-state';
 import { periodLabelFor } from '@utils/search-params';
@@ -32,10 +34,11 @@ const NOTHING = 'Inget';
 interface Props {
   filters: FilterState;
   countFor: (type: DocumentType) => number;
+  categoryCounts: CategoryCount[];
   onChange: (next: FilterState) => void;
 }
 
-export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, onChange }) => {
+export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCounts, onChange }) => {
   const isMobile = useMediaQuery(BELOW_MD);
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState<FilterState>(EMPTY_FILTERS);
@@ -80,17 +83,8 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, onChange }
       ),
     },
     {
-      key: 'location',
-      node: (
-        <TextFilter
-          label="Plats"
-          placeholder="Skriv en plats"
-          applyLabel="Visa plats"
-          value={filters.location}
-          onApply={(next) => onChange(setScoped(filters, 'location', next))}
-          data-cy="place-filter"
-        />
-      ),
+      key: 'place',
+      node: <PlaceFilter selected={filters.places} onToggle={(place) => onChange(togglePlace(filters, place))} />,
     },
     {
       key: 'creator',
@@ -118,6 +112,7 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, onChange }
       key: 'category',
       node: (
         <CategoryFilter
+          counts={categoryCounts}
           selected={filters.categories}
           onToggle={(category) => onChange(toggleCategory(filters, category))}
         />
@@ -160,19 +155,11 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, onChange }
       ),
     },
     {
-      key: 'location',
+      key: 'place',
       label: 'Plats',
-      summary: draft.location ?? NOTHING,
+      summary: draft.places.map((place) => place.name).join(', ') || NOTHING,
       body: (
-        <TextFilterBody
-          label="Plats"
-          placeholder="Skriv en plats"
-          applyLabel="Visa plats"
-          value={draft.location}
-          onApply={(next) => setDraft(setScoped(draft, 'location', next))}
-          autoApply
-          data-cy="place-filter"
-        />
+        <PlaceFilterBody selected={draft.places} onToggle={(place) => setDraft(togglePlace(draft, place))} hideLabel />
       ),
     },
     {
@@ -225,9 +212,10 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, onChange }
     {
       key: 'category',
       label: 'Verksamhetskategori',
-      summary: draft.categories.join(', ') || NOTHING,
+      summary: draft.categories.map((category) => category.name).join(', ') || NOTHING,
       body: (
         <CategoryFilterBody
+          counts={categoryCounts}
           selected={draft.categories}
           onToggle={(category) => setDraft(toggleCategory(draft, category))}
         />
