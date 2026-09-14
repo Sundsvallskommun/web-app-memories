@@ -261,7 +261,7 @@ const SearchPage: React.FC = () => {
   };
 
   return (
-    <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
+    <DefaultLayout>
       <Main>
         <div className="flex flex-col gap-md">
           <h1 className="sr-only">Sök i Sundsvallsminnen</h1>
