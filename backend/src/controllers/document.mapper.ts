@@ -517,9 +517,16 @@ export interface TypeCount {
   count: number;
 }
 
+export interface CategoryCount {
+  categoryId: number;
+  name: string;
+  count: number;
+}
+
 export interface CombinedObjectResponse {
   objects: CombinedObject[];
   typeCounts: TypeCount[];
+  categoryCounts?: CategoryCount[];
   _meta: PagingMetaData;
 }
 
