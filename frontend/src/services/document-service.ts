@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Document, SearchParams, SearchResult } from '@data-contracts/document';
+import { CategoryCount, Document, SearchParams, SearchResult } from '@data-contracts/document';
 import { apiService } from '@services/api-service';
 
 interface ApiResponse {
@@ -12,6 +12,10 @@ interface ApiResponse {
   objectTotal: number;
   audioTotal: number;
   textTotal: number;
+  personTotal: number;
+  censusTotal: number;
+  seamanTotal: number;
+  categoryCounts?: CategoryCount[];
   page: number;
   pageSize: number;
   message: string;
@@ -26,7 +30,14 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
     pageSize: String(pageSize),
   };
   if (params.query) queryParams.query = params.query;
-  if (params.type) queryParams.type = params.type;
+  if (params.types?.length) queryParams.type = params.types.join(`,`);
+  if (params.yearFrom) queryParams.yearFrom = String(params.yearFrom);
+  if (params.yearTo) queryParams.yearTo = String(params.yearTo);
+  if (params.places?.length) queryParams.place = params.places.join(',');
+  if (params.creator) queryParams.creator = params.creator;
+  if (params.gender) queryParams.gender = params.gender;
+  if (params.organisations?.length) queryParams.organisation = params.organisations.join(',');
+  if (params.categories?.length) queryParams.category = params.categories.join(',');
   if (params.sortBy) queryParams.sortBy = params.sortBy;
   if (params.sortDirection) queryParams.sortDirection = params.sortDirection;
 
@@ -45,6 +56,10 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
     objectTotal: data?.objectTotal || 0,
     audioTotal: data?.audioTotal || 0,
     textTotal: data?.textTotal || 0,
+    personTotal: data?.personTotal || 0,
+    censusTotal: data?.censusTotal || 0,
+    seamanTotal: data?.seamanTotal || 0,
+    categoryCounts: data?.categoryCounts ?? [],
   };
 };
 

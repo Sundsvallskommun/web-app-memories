@@ -6,6 +6,7 @@ import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
 import {
   Audio,
+  CensusRecord,
   CombinedObjectResponse,
   DOCUMENT_OBJECT_TYPES,
   Film,
@@ -14,6 +15,7 @@ import {
   Text,
   TypeCount,
   mapAudioToDocument,
+  mapCensusRecordToDocument,
   mapCombinedObjectsToDocuments,
   mapFilmToDocument,
   mapPhotoToDocument,
@@ -34,7 +36,7 @@ import {
 // could only produce accurate totals by fetching everything first.
 
 /** Upstream sort fields. Anything else is dropped rather than substituted. */
-const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType']);
+const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType', 'location']);
 
 const toUpstreamSort = (sortBy: string | undefined): string | undefined =>
   sortBy && SORTABLE.has(sortBy) ? sortBy : undefined;
@@ -62,10 +64,41 @@ const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
   Person: 'Person',
   Seaman: 'Sjöman',
   LegalEntity: 'Juridisk person',
+  Census: 'Mantal',
 };
+
+/**
+ * The registers that carry a gender. Sjöman is deliberately absent: the source
+ * has no such column for seamen, so a gender filter silently drops all 116 094
+ * of them however it is applied.
+ */
+const GENDERED_OBJECT_TYPES = ['Person', 'Mantal'];
 
 const countFor = (typeCounts: TypeCount[] | undefined, objectType: string): number =>
   typeCounts?.find(c => c.objectType === objectType)?.count ?? 0;
+
+/** Appends each numeric id in a comma-separated list, so several values widen the search. */
+const appendIds = (params: URLSearchParams, key: string, ids: string | undefined): void => {
+  for (const id of (ids ?? '').split(',').map(value => value.trim())) {
+    if (/^\d+$/.test(id)) params.append(key, id);
+  }
+};
+
+const upstreamObjectTypes = (type: string | undefined, gender: string | undefined): string[] => {
+  const requested = [
+    ...new Set(
+      (type ?? '')
+        .split(',')
+        .map(name => DOCUMENT_TYPE_TO_OBJECT_TYPE[name.trim()])
+        .filter(Boolean),
+    ),
+  ];
+  if (requested.length > 0) return requested;
+
+  // Only Person and Mantal record a gender, so falling back to the document
+  // types would make a gender filter on its own return nothing at all.
+  return gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
+};
 
 const FALLBACK_FILE_CACHE_CONTROL = 'public, max-age=86400';
 
@@ -94,8 +127,11 @@ export class DocumentController {
     @QueryParam('sortDirection') sortDirection: string,
     @QueryParam('yearFrom') yearFrom: number,
     @QueryParam('yearTo') yearTo: number,
-    @QueryParam('location') location: string,
+    @QueryParam('place') place: string,
     @QueryParam('creator') creator: string,
+    @QueryParam('gender') gender: string,
+    @QueryParam('organisation') organisation: string,
+    @QueryParam('category') category: string,
     @Res() response: Response,
   ) {
     const safePageSize = Math.max(1, pageSize);
@@ -114,20 +150,22 @@ export class DocumentController {
     if (trimmedQuery) params.set('query', trimmedQuery);
     if (yearFrom) params.set('yearFrom', String(yearFrom));
     if (yearTo) params.set('yearTo', String(yearTo));
-    if (location?.trim()) params.set('location', location.trim());
-    if (creator?.trim()) params.set('creator', creator.trim());
 
-    // Restrict to the requested type, or to the document types when none is
-    // given. Registers hold about 174k of the 205k records, so without this a
-    // plain search would return mostly persons and seamen.
-    const requestedObjectType = type ? DOCUMENT_TYPE_TO_OBJECT_TYPE[type] : undefined;
-    for (const objectType of requestedObjectType ? [requestedObjectType] : DOCUMENT_OBJECT_TYPES) {
+    appendIds(params, 'topographyId', place);
+    if (creator?.trim()) params.set('creator', creator.trim());
+    // Only the person registers record a gender, so this also excludes every
+    // document type and all 116k seamen, who have no such column upstream.
+    if (gender?.trim()) params.set('gender', gender.trim());
+    appendIds(params, 'creatorLegalEntityId', organisation);
+    appendIds(params, 'categoryId', category);
+
+    for (const objectType of upstreamObjectTypes(type, gender)) {
       params.append('objectType', objectType);
     }
 
     const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/objects?${params.toString()}`;
     const res = await this.apiService.get<CombinedObjectResponse>({ url });
-    const { objects = [], typeCounts, _meta } = res.data;
+    const { objects = [], typeCounts, categoryCounts = [], _meta } = res.data;
 
     return response.send({
       data: mapCombinedObjectsToDocuments(objects),
@@ -139,6 +177,10 @@ export class DocumentController {
       objectTotal: countFor(typeCounts, 'Föremål'),
       audioTotal: countFor(typeCounts, 'Ljud'),
       textTotal: countFor(typeCounts, 'Text'),
+      personTotal: countFor(typeCounts, 'Person'),
+      censusTotal: countFor(typeCounts, 'Mantal'),
+      seamanTotal: countFor(typeCounts, 'Sjöman'),
+      categoryCounts: categoryCounts.map(({ categoryId, name, count }) => ({ id: categoryId, name, count })),
       page: _meta?.page ?? safePage,
       pageSize: _meta?.limit ?? safePageSize,
       message: 'success',
@@ -184,10 +226,16 @@ export class DocumentController {
       return response.send({ data: mapTextToDocument(res.data), message: 'success' });
     }
 
-    // Register records (person-, jurpers-, sjoman-) are searchable through
-    // /objects but have no document representation, so there is nothing to
-    // render. Answer 404 rather than falling through to the film branch, which
-    // would report the id as malformed.
+    if (id.startsWith('mantal-')) {
+      const censusId = id.slice('mantal-'.length);
+      if (!/^\d{4}-\d+$/.test(censusId)) throw new HttpException(400, `Invalid document id: ${id}`);
+
+      const res = await this.apiService.get<CensusRecord>({
+        url: `${base}/${MUNICIPALITY_ID}/census-records/${censusId}`,
+      });
+      return response.send({ data: mapCensusRecordToDocument(res.data), message: 'success' });
+    }
+
     if (/^[a-z]+-/.test(id) && !id.startsWith('film-')) {
       throw new HttpException(404, 'Not found');
     }
