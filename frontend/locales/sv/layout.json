@@ -1,37 +1,5 @@
 {
   "header": {
-    "goto_content": "Hoppa till innehåll",
-    "subtitle": "Sök i arkivets databas"
-  },
-  "footer": {
-    "title": "Sundsvallsminnen",
-    "directions": "Resa hit",
-    "contact_us": "Kontakta oss",
-    "contact": {
-      "heading": "Kontakt",
-      "address": "Norrmalmsgatan 4, 853 85 Sundsvall",
-      "email": "kontakt@sundsvall.se",
-      "phone": "060-123 45 67",
-      "opening_hours": "Mån–fre 09.00–16.00",
-      "more": "Fler kontaktvägar och öppettider",
-      "phone_label": "Telefon",
-      "email_label": "E-postadress",
-      "address_label": "Besöksadress",
-      "opening_hours_label": "Öppettider"
-    },
-    "about": {
-      "heading": "Om innehållet",
-      "site": "Om webbplatsen",
-      "accessibility": "Tillgänglighetsredogörelse",
-      "personal_data": "Behandling av personuppgifter",
-      "cookies": "Om kakor (cookies)"
-    },
-    "social": {
-      "heading": "Följ oss",
-      "facebook": "Facebook",
-      "instagram": "Instagram",
-      "linkedin": "LinkedIn",
-      "youtube": "Youtube"
-    }
+    "goto_content": "Hoppa till innehåll"
   }
 }

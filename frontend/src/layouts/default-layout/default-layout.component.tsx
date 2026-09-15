@@ -24,7 +24,7 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
   };
 
   const title = process.env.NEXT_PUBLIC_APP_NAME;
-  const subtitle = t('layout:header.subtitle');
+  const subtitle = 'Sök i arkivets databas';
 
   return (
     <div className="DefaultLayout full-page-layout">

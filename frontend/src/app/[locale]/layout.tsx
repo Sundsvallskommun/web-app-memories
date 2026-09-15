@@ -22,7 +22,7 @@ export const generateMetadata = async ({ params }: LocaleLayoutProps) => {
   const { t } = await initLocalization(locale, namespaces);
   const path = (await headers()).get('x-path');
 
-  const pageTitle = t(`paths:${path}.title`, { defaultValue: t('layout:header.subtitle') });
+  const pageTitle = t(`paths:${path}.title`, { defaultValue: 'Sök i arkivets databas' });
   const title = path ? `Sundsvallsminnen - ${pageTitle}` : 'Sundsvallsminnen';
   const description = t(`paths:${path}.description`, {
     defaultValue: 'Sök bland kulturhistoriskt material från Sundsvallsregionen',
