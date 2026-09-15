@@ -160,7 +160,8 @@ export const AppFooter: React.FC = () => {
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const label = t(`layout:${item.label}`);
-                  const text = item.prefix ? `${t(`layout:${item.prefix}`)}: ${label}` : label;
+                  const prefix = item.prefix ? t(`layout:${item.prefix}`) : undefined;
+                  const text = prefix ? `${prefix}: ${label}` : label;
 
                   return (
                     <li key={item.label} className="flex items-center gap-8">
