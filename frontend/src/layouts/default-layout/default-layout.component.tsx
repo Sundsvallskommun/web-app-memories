@@ -10,7 +10,7 @@ interface DefaultLayoutProps {
   children: React.ReactNode;
 }
 
-export default function DefaultLayout({ children }: DefaultLayoutProps) {
+export default function DefaultLayout({ children }: Readonly<DefaultLayoutProps>) {
   const router = useRouter();
   const { t } = useTranslation();
 
