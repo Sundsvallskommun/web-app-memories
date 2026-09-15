@@ -101,7 +101,7 @@ export const YearPicker: React.FC<Props> = ({
               <ChevronLeft size={16} />
             </Button>
             <span className="text-label-small">
-              {years[0]} - {years[years.length - 1]}
+              {years[0]} - {years.at(-1)}
             </span>
             <Button
               iconButton

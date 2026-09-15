@@ -63,7 +63,7 @@ export const ResultsToolbar: React.FC<Props> = ({
             Visar {rangeStart}–{rangeEnd} av {result.total} {result.total === 1 ? 'träff' : 'träffar'}
           </p>
         )}
-        {result && result.total === 0 && <p className="text-label-medium">0 träffar</p>}
+        {result?.total === 0 && <p className="text-label-medium">0 träffar</p>}
       </div>
 
       <div className="flex items-center justify-between gap-sm flex-wrap">

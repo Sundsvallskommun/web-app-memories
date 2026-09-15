@@ -62,12 +62,9 @@ export const setScoped = (state: FilterState, filter: ScopedFilter, value?: stri
   if (!value) return { ...state, [filter]: undefined };
 
   const kept = state.types.filter((type) => TYPES_SUPPORTING[filter].includes(type));
-  const types =
-    kept.length > 0 ? kept
-    : filter === 'gender' ? GENDERED_REGISTERS
-    : [];
+  if (kept.length > 0) return { ...state, [filter]: value, types: kept };
 
-  return { ...state, [filter]: value, types };
+  return { ...state, [filter]: value, types: filter === 'gender' ? GENDERED_REGISTERS : [] };
 };
 
 export const togglePlace = (state: FilterState, place: Place): FilterState => {
