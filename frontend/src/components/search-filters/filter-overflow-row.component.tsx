@@ -17,7 +17,7 @@ interface Props {
 export const FilterOverflowRow: React.FC<Props> = ({ items, className }) => {
   const rowRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
-  const widths = useRef<number[] | null>(null);
+  const widths = useRef<number[]>([]);
   const moreWidth = useRef(0);
   const [visibleCount, setVisibleCount] = useState(items.length);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -26,20 +26,20 @@ export const FilterOverflowRow: React.FC<Props> = ({ items, className }) => {
     const row = rowRef.current;
     if (!row) return;
 
+    const renderedItems = () => row.querySelectorAll<HTMLElement>(':scope > [data-overflow-item]');
+
     const measure = () => {
-      if (!widths.current) {
-        widths.current = Array.from(row.children)
-          .slice(0, items.length)
-          .map((child) => child.getBoundingClientRect().width);
-        moreWidth.current = ghostRef.current?.getBoundingClientRect().width ?? 0;
-      }
+      renderedItems().forEach((child, index) => {
+        widths.current[index] = child.getBoundingClientRect().width;
+      });
+      moreWidth.current = ghostRef.current?.getBoundingClientRect().width ?? 0;
 
       const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0;
       const available = row.clientWidth;
 
       let used = 0;
       let count = 0;
-      for (const width of widths.current) {
+      for (const width of widths.current.slice(0, items.length)) {
         const next = used + width + (count > 0 ? gap : 0);
         if (next > available) break;
         used = next;
@@ -57,8 +57,10 @@ export const FilterOverflowRow: React.FC<Props> = ({ items, className }) => {
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(row);
+    if (ghostRef.current) observer.observe(ghostRef.current);
+    renderedItems().forEach((child) => observer.observe(child));
     return () => observer.disconnect();
-  }, [items.length]);
+  }, [items.length, visibleCount]);
 
   const visible = items.slice(0, visibleCount);
   const hidden = items.slice(visibleCount);
@@ -66,7 +68,7 @@ export const FilterOverflowRow: React.FC<Props> = ({ items, className }) => {
   return (
     <div ref={rowRef} className={`flex min-w-0 items-center gap-4 ${className ?? ''}`}>
       {visible.map((item) => (
-        <div key={item.key} className="shrink-0">
+        <div key={item.key} className="shrink-0" data-overflow-item>
           {item.node}
         </div>
       ))}
