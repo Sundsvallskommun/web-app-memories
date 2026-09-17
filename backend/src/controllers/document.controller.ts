@@ -10,16 +10,20 @@ import {
   CombinedObjectResponse,
   DOCUMENT_OBJECT_TYPES,
   Film,
+  Person,
   Photo,
   Publication,
+  Seaman,
   Text,
   TypeCount,
   mapAudioToDocument,
   mapCensusRecordToDocument,
   mapCombinedObjectsToDocuments,
   mapFilmToDocument,
+  mapPersonToDocument,
   mapPhotoToDocument,
   mapPublicationToDocument,
+  mapSeamanToDocument,
   mapTextToDocument,
 } from './document.mapper';
 
@@ -235,6 +239,18 @@ export class DocumentController {
         url: `${base}/${MUNICIPALITY_ID}/census-records/${censusId}`,
       });
       return response.send({ data: mapCensusRecordToDocument(res.data), message: 'success' });
+    }
+
+    if (id.startsWith('person-')) {
+      const personId = this.extractNumericId(id, 'person-');
+      const res = await this.apiService.get<Person>({ url: `${base}/${MUNICIPALITY_ID}/persons/${personId}` });
+      return response.send({ data: mapPersonToDocument(res.data), message: 'success' });
+    }
+
+    if (id.startsWith('sjoman-')) {
+      const seamanId = this.extractNumericId(id, 'sjoman-');
+      const res = await this.apiService.get<Seaman>({ url: `${base}/${MUNICIPALITY_ID}/seamen/${seamanId}` });
+      return response.send({ data: mapSeamanToDocument(res.data), message: 'success' });
     }
 
     if (/^[a-z]+-/.test(id) && !id.startsWith('film-')) {

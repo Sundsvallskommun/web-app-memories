@@ -160,6 +160,13 @@ export interface Document {
   // Composite ids of related documents (Photo / FOTO_FOTO), shown as a
   // "related" strip on the detail page. Each links to its own detail page.
   relatedIds?: string[];
+  // Labelled rows for the registers, whose fields do not fit the document shape above.
+  details?: DetailRow[];
+}
+
+export interface DetailRow {
+  label: string;
+  value: string;
 }
 
 // The upstream DB uses literal "3000" (and similar future-year strings) as a
@@ -523,7 +530,6 @@ export interface CategoryCount {
   count: number;
 }
 
-/** Hits per place. Like the category counts, each ignores its own place filter. */
 export interface TopographyCount {
   topographyId: number;
   name: string;
@@ -558,6 +564,136 @@ const OBJECT_TYPE_TO_DOCUMENT_TYPE: Record<string, string> = {
 
 /** The six types that carry documents. The registers are searchable but are not documents. */
 export const DOCUMENT_OBJECT_TYPES = ['Foto', 'Föremål', 'Film', 'Ljud', 'Text', 'Publikation'];
+
+export interface Person {
+  personId: number;
+  firstName: string | null;
+  lastName: string | null;
+  gender: string | null;
+  /** YYYYMMDD, YYYY, or "0" when unknown. */
+  birthDate: string | null;
+  deathDate: string | null;
+  birthParish: string | null;
+  occupation: string | null;
+  movedInParish: string | null;
+  movedOutParish: string | null;
+  relatedPersonName: string | null;
+  relatedPersonOccupation: string | null;
+  sources: string | null;
+  comment: string | null;
+  biographyFilename: string | null;
+}
+
+export interface Seaman {
+  id: number;
+  firstName: string | null;
+  lastName1: string | null;
+  lastName2: string | null;
+  /** YYYYMMDD, YYYY, or empty when unknown, like the other dates here. */
+  birthDate: string | null;
+  birthParish: string | null;
+  birthPlace: string | null;
+  homeParish: string | null;
+  homePlace: string | null;
+  age: string | null;
+  civilStatus: string | null;
+  father: string | null;
+  mother: string | null;
+  rank: string | null;
+  ship: string | null;
+  shipType: string | null;
+  shipOwner: string | null;
+  captain: string | null;
+  homePort: string | null;
+  destination: string | null;
+  signOnDate: string | null;
+  signOnPlace: string | null;
+  signOffDate: string | null;
+  signOffPlace: string | null;
+  enrollmentDate: string | null;
+  enrollmentNumber: string | null;
+  seamensHouse: string | null;
+  archive: string | null;
+  archiveNumber: string | null;
+  volume: string | null;
+  page: string | null;
+  note: string | null;
+  other: string | null;
+}
+
+/** "18460626" becomes "1846-06-26". A bare year is kept, and "0" means unknown. */
+const archiveDate = (value: string | null | undefined): string | undefined => {
+  const trimmed = opt(value);
+  if (!trimmed || trimmed === '0') return undefined;
+  return /^\d{8}$/.test(trimmed) ? `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6)}` : trimmed;
+};
+
+const joined = (...parts: (string | null | undefined)[]): string | undefined =>
+  parts.map(opt).filter(Boolean).join(', ') || undefined;
+
+const detailRows = (entries: [string, string | undefined][]): DetailRow[] =>
+  entries.filter((entry): entry is [string, string] => !!entry[1]).map(([label, value]) => ({ label, value }));
+
+export const mapPersonToDocument = (person: Person): Document => ({
+  id: `person-${person.personId}`,
+  title: [opt(person.firstName), opt(person.lastName)].filter(Boolean).join(' '),
+  type: 'Person',
+  year: parseYear(archiveDate(person.birthDate) ?? null),
+  location: opt(person.birthParish) ?? '',
+  creator: '',
+  description: '',
+  details: detailRows([
+    ['Förnamn', opt(person.firstName)],
+    ['Efternamn', opt(person.lastName)],
+    ['Kön', opt(person.gender)],
+    ['Födelsedatum', archiveDate(person.birthDate)],
+    ['Födelseförsamling', opt(person.birthParish)],
+    ['Dödsdatum', archiveDate(person.deathDate)],
+    ['Yrke', opt(person.occupation)],
+    ['Inflyttad från', opt(person.movedInParish)],
+    ['Utflyttad till', opt(person.movedOutParish)],
+    ['Relaterad person', joined(person.relatedPersonName, person.relatedPersonOccupation)],
+    ['Källa', opt(person.sources)],
+    ['Kommentar', opt(person.comment)],
+  ]),
+});
+
+export const mapSeamanToDocument = (seaman: Seaman): Document => ({
+  id: `sjoman-${seaman.id}`,
+  title: [opt(seaman.firstName), opt(seaman.lastName1), opt(seaman.lastName2)].filter(Boolean).join(' '),
+  type: 'Seaman',
+  year: parseYear(archiveDate(seaman.birthDate) ?? null),
+  location: opt(seaman.homeParish) ?? opt(seaman.birthParish) ?? '',
+  creator: '',
+  description: '',
+  details: detailRows([
+    ['Förnamn', opt(seaman.firstName)],
+    ['Efternamn', joined(seaman.lastName1, seaman.lastName2)],
+    ['Födelsedatum', archiveDate(seaman.birthDate)],
+    ['Födelseförsamling', opt(seaman.birthParish)],
+    ['Födelseort', opt(seaman.birthPlace)],
+    ['Hemförsamling', opt(seaman.homeParish)],
+    ['Hemort', opt(seaman.homePlace)],
+    ['Ålder', opt(seaman.age)],
+    ['Civilstånd', opt(seaman.civilStatus)],
+    ['Far', opt(seaman.father)],
+    ['Mor', opt(seaman.mother)],
+    ['Befattning', opt(seaman.rank)],
+    ['Fartyg', joined(seaman.ship, seaman.shipType)],
+    ['Befälhavare', opt(seaman.captain)],
+    ['Redare', opt(seaman.shipOwner)],
+    ['Hemmahamn', opt(seaman.homePort)],
+    ['Destination', opt(seaman.destination)],
+    ['Påmönstring', joined(archiveDate(seaman.signOnDate), seaman.signOnPlace)],
+    ['Avmönstring', joined(archiveDate(seaman.signOffDate), seaman.signOffPlace)],
+    ['Inskrivning', joined(archiveDate(seaman.enrollmentDate), seaman.enrollmentNumber)],
+    ['Sjömanshus', opt(seaman.seamensHouse)],
+    ['Arkiv', joined(seaman.archive, seaman.archiveNumber)],
+    ['Volym', joined(seaman.volume, seaman.page ? `sida ${seaman.page}` : undefined)],
+    ['Anteckning', opt(seaman.note)],
+    ['Övrigt', opt(seaman.other)],
+  ]),
+});
 
 export interface CensusRecord {
   id: string;
