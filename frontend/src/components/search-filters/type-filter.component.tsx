@@ -32,7 +32,7 @@ export const TypeFilterBody: React.FC<Props> = ({ types, selected, countFor, onT
 export const TypeFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu>
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="type-filter">
+      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="type-filter">
         Typ
       </PopupMenu.Button>
 

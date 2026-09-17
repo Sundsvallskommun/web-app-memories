@@ -64,7 +64,7 @@ export const TextFilterBody: React.FC<BodyProps> = ({
 export const TextFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu type="dialog">
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy={props['data-cy']}>
+      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy={props['data-cy']}>
         {props.label}
       </PopupMenu.Button>
 

@@ -81,7 +81,7 @@ export const PeriodFilterBody: React.FC<BodyProps> = ({ yearFrom, yearTo, onAppl
 export const PeriodFilter: React.FC<Props> = ({ yearFrom, yearTo, onApply }) => (
   <div className="relative">
     <PopupMenu type="dialog">
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="period-filter">
+      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="period-filter">
         Tidsperiod
       </PopupMenu.Button>
 

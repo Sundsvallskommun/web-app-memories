@@ -74,7 +74,7 @@ export const PersonFilterBody: React.FC<Props> = ({
 export const PersonFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu>
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="person-filter">
+      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="person-filter">
         Person
       </PopupMenu.Button>
 

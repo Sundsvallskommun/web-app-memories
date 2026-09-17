@@ -101,7 +101,7 @@ export const OrganisationFilterBody: React.FC<BodyProps> = ({ selected, onToggle
 export const OrganisationFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu type="dialog">
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="organisation-filter">
+      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="organisation-filter">
         Institution
       </PopupMenu.Button>
 

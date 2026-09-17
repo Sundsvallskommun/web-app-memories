@@ -111,7 +111,7 @@ export const PlaceFilterBody: React.FC<BodyProps> = ({ selected, onToggle, hideL
 export const PlaceFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu type="dialog">
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="place-filter">
+      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="place-filter">
         Plats
       </PopupMenu.Button>
 

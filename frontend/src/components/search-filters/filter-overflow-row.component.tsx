@@ -76,7 +76,12 @@ export const FilterOverflowRow: React.FC<Props> = ({ items, className }) => {
       {hidden.length > 0 && (
         <div className="relative ml-auto shrink-0">
           <PopupMenu type="dialog" align="end" open={moreOpen} onToggleOpen={setMoreOpen}>
-            <PopupMenu.Button variant="tertiary" leftIcon={<ListFilter size={18} />} data-cy="more-filters-button">
+            <PopupMenu.Button
+              size="sm"
+              variant="tertiary"
+              leftIcon={<ListFilter size={18} />}
+              data-cy="more-filters-button"
+            >
               Fler filter
             </PopupMenu.Button>
 
@@ -100,7 +105,7 @@ export const FilterOverflowRow: React.FC<Props> = ({ items, className }) => {
       {/* Out of flow and only here to be measured: the row has to know how much
         room "Fler filter" needs before it decides that it needs one. */}
       <div ref={ghostRef} aria-hidden className="invisible pointer-events-none absolute -z-10">
-        <Button variant="tertiary" leftIcon={<ListFilter size={18} />} tabIndex={-1}>
+        <Button size="sm" variant="tertiary" leftIcon={<ListFilter size={18} />} tabIndex={-1}>
           Fler filter
         </Button>
       </div>

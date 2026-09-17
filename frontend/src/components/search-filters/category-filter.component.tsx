@@ -45,7 +45,7 @@ export const CategoryFilterBody: React.FC<Props> = ({ counts, selected, onToggle
 export const CategoryFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu>
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="category-filter">
+      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="category-filter">
         Verksamhetskategori
       </PopupMenu.Button>
 

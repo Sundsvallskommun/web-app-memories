@@ -327,7 +327,8 @@ const SearchPage: React.FC = () => {
                   setQueryDraft('');
                   updateUrl({ q: undefined });
                 }}
-                placeholder="Fritext sök"
+                size="md"
+                placeholder="Fritextsök"
                 aria-label="Sökfält"
               />
             </div>
@@ -359,7 +360,6 @@ const SearchPage: React.FC = () => {
               page={page}
               pageSize={pageSize}
               onRetry={() => setRetryToken((t) => t + 1)}
-              onDismissError={() => setFailed(false)}
               onPageChange={handlePageChange}
             />
           </div>
