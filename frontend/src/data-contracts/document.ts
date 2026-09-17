@@ -79,6 +79,8 @@ export interface Document {
   relatedIds?: string[];
   // Labelled rows for the registers (Person, Sjöman), shown instead of the document rows.
   details?: { label: string; value: string }[];
+  // HTML already cleaned by the BFF: a person's biography or a legal entity's history.
+  longText?: string;
 }
 
 /** A category the creating organisations are grouped into, Verksamhetskategori. */
