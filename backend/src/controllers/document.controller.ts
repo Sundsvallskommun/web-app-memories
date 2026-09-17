@@ -4,11 +4,13 @@ import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
 import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
+import { getCollection } from '@services/collection.service';
 import {
   Audio,
   CensusRecord,
   CombinedObjectResponse,
   DOCUMENT_OBJECT_TYPES,
+  Document,
   Film,
   LegalEntityRecord,
   Person,
@@ -106,6 +108,12 @@ const upstreamObjectTypes = (type: string | undefined, gender: string | undefine
   return gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
 };
 
+/** Adds the full archive chain, which the object view shows as Samling. */
+const withCollection = async (document: Document, nodeId: number | null | undefined): Promise<Document> => {
+  const collection = await getCollection(nodeId);
+  return collection ? { ...document, archiveCollection: collection.chain } : document;
+};
+
 const FALLBACK_FILE_CACHE_CONTROL = 'public, max-age=86400';
 
 const fileCacheControl = (upstream: string | undefined): string =>
@@ -173,8 +181,14 @@ export class DocumentController {
     const res = await this.apiService.get<CombinedObjectResponse>({ url });
     const { objects = [], typeCounts, categoryCounts = [], topographyCounts = [], _meta } = res.data;
 
+    const documents = mapCombinedObjectsToDocuments(objects);
+    const collections = await Promise.all(objects.map(object => getCollection(object.nodeId)));
+    documents.forEach((document, index) => {
+      document.archiveCollection = collections[index]?.archive;
+    });
+
     return response.send({
-      data: mapCombinedObjectsToDocuments(objects),
+      data: documents,
       total: _meta?.totalRecords ?? objects.length,
       totalPages: _meta?.totalPages ?? 1,
       filmTotal: countFor(typeCounts, 'Film'),
@@ -213,25 +227,37 @@ export class DocumentController {
     if (id.startsWith('publ-')) {
       const publId = this.extractNumericId(id, 'publ-');
       const res = await this.apiService.get<Publication>({ url: `${base}/${MUNICIPALITY_ID}/publications/${publId}` });
-      return response.send({ data: mapPublicationToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapPublicationToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('photo-')) {
       const photoId = this.extractNumericId(id, 'photo-');
       const res = await this.apiService.get<Photo>({ url: `${base}/${MUNICIPALITY_ID}/photos/${photoId}` });
-      return response.send({ data: mapPhotoToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapPhotoToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('audio-')) {
       const audioId = this.extractNumericId(id, 'audio-');
       const res = await this.apiService.get<Audio>({ url: `${base}/${MUNICIPALITY_ID}/audios/${audioId}` });
-      return response.send({ data: mapAudioToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapAudioToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('text-')) {
       const textId = this.extractNumericId(id, 'text-');
       const res = await this.apiService.get<Text>({ url: `${base}/${MUNICIPALITY_ID}/texts/${textId}` });
-      return response.send({ data: mapTextToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapTextToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('mantal-')) {
@@ -270,7 +296,10 @@ export class DocumentController {
 
     const filmId = this.extractNumericId(id.startsWith('film-') ? id : `film-${id}`, 'film-');
     const res = await this.apiService.get<Film>({ url: `${base}/${MUNICIPALITY_ID}/films/${filmId}` });
-    return response.send({ data: mapFilmToDocument(res.data), message: 'success' });
+    return response.send({
+      data: await withCollection(mapFilmToDocument(res.data), res.data.nodeId),
+      message: 'success',
+    });
   }
 
   /**

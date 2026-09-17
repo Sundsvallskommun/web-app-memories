@@ -37,6 +37,7 @@ export interface Publication {
   largeImageFilename: string | null;
   ocrFilename: string | null;
   xmltext: string | null;
+  nodeId?: number | null;
 }
 
 export interface Audio {
@@ -51,6 +52,7 @@ export interface Audio {
   subject: string | null;
   comment: string | null;
   audioMimeType: string | null;
+  nodeId?: number | null;
 }
 
 export interface Photo {
@@ -78,6 +80,7 @@ export interface Photo {
   referenceCode: string | null;
   // IDs of related photos via FOTO_FOTO. Only populated on detail lookup.
   relatedPhotoIds: number[] | null;
+  nodeId?: number | null;
 }
 
 export interface TextMediaFile {
@@ -103,6 +106,7 @@ export interface Text {
   ocrFilename: string | null;
   xmltext: string | null;
   mediaFiles: TextMediaFile[] | null;
+  nodeId?: number | null;
 }
 
 export interface DocumentFile {
@@ -517,6 +521,8 @@ export interface CombinedObject {
   /** Resolved place name from TOPOGRAFI, preferred over locationText. */
   location: string | null;
   creator?: Creator | null;
+  /** The archive node the object sits in. Empty for the registers. */
+  nodeId?: number | null;
 }
 
 export interface TypeCount {
