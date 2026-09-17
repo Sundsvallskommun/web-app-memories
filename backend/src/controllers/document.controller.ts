@@ -10,6 +10,7 @@ import {
   CombinedObjectResponse,
   DOCUMENT_OBJECT_TYPES,
   Film,
+  LegalEntityRecord,
   Person,
   Photo,
   Publication,
@@ -20,6 +21,7 @@ import {
   mapCensusRecordToDocument,
   mapCombinedObjectsToDocuments,
   mapFilmToDocument,
+  mapLegalEntityToDocument,
   mapPersonToDocument,
   mapPhotoToDocument,
   mapPublicationToDocument,
@@ -184,6 +186,7 @@ export class DocumentController {
       personTotal: countFor(typeCounts, 'Person'),
       censusTotal: countFor(typeCounts, 'Mantal'),
       seamanTotal: countFor(typeCounts, 'Sjöman'),
+      legalEntityTotal: countFor(typeCounts, 'Juridisk person'),
       categoryCounts: categoryCounts.map(({ categoryId, name, count }) => ({ id: categoryId, name, count })),
       placeCounts: topographyCounts.map(({ topographyId, name, count }) => ({ id: topographyId, name, count })),
       page: _meta?.page ?? safePage,
@@ -245,6 +248,14 @@ export class DocumentController {
       const personId = this.extractNumericId(id, 'person-');
       const res = await this.apiService.get<Person>({ url: `${base}/${MUNICIPALITY_ID}/persons/${personId}` });
       return response.send({ data: mapPersonToDocument(res.data), message: 'success' });
+    }
+
+    if (id.startsWith('jurpers-')) {
+      const legalEntityId = this.extractNumericId(id, 'jurpers-');
+      const res = await this.apiService.get<LegalEntityRecord>({
+        url: `${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}`,
+      });
+      return response.send({ data: mapLegalEntityToDocument(res.data), message: 'success' });
     }
 
     if (id.startsWith('sjoman-')) {

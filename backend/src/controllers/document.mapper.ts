@@ -695,6 +695,40 @@ export const mapSeamanToDocument = (seaman: Seaman): Document => ({
   ]),
 });
 
+export interface LegalEntityRecord {
+  legalEntityId: number;
+  name: string | null;
+  alternativeNames: string | null;
+  category: string | null;
+  location: string | null;
+  locationText: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  principal: string | null;
+  comment: string | null;
+  historyFilename: string | null;
+}
+
+export const mapLegalEntityToDocument = (entity: LegalEntityRecord): Document => ({
+  id: `jurpers-${entity.legalEntityId}`,
+  title: opt(entity.name) ?? '',
+  type: 'LegalEntity',
+  year: parseYear(entity.startDate),
+  location: pickLocation(entity.location, entity.locationText),
+  creator: '',
+  description: '',
+  details: detailRows([
+    ['Namn', opt(entity.name)],
+    ['Andra namn', opt(entity.alternativeNames)],
+    ['Kategori', opt(entity.category)],
+    ['Plats', opt(entity.location) ?? opt(entity.locationText)],
+    ['Startår', opt(entity.startDate)],
+    ['Slutår', opt(entity.endDate)],
+    ['Huvudman', opt(entity.principal)],
+    ['Kommentar', opt(entity.comment)],
+  ]),
+});
+
 export interface CensusRecord {
   id: string;
   firstName: string | null;
