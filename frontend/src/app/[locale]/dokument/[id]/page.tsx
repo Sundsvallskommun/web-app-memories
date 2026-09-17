@@ -24,6 +24,7 @@ const metaRows = (doc: Document): { label: string; value: string }[] => {
 
   return [
     typeRow,
+    { label: 'Samling', value: doc.archiveCollection ?? '' },
     { label: 'Upphovsman', value: doc.creator },
     { label: 'Plats', value: doc.location },
     { label: 'Tidpunkt', value: doc.year ? String(doc.year) : '' },
