@@ -5,6 +5,7 @@ import { HttpException } from '@/exceptions/HttpException';
 import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
 import { getCollection } from '@services/collection.service';
+import { cleanHtml } from '@/utils/clean-html';
 import {
   Audio,
   CensusRecord,
@@ -114,6 +115,9 @@ const withCollection = async (document: Document, nodeId: number | null | undefi
   return collection ? { ...document, archiveCollection: collection.chain } : document;
 };
 
+/** A slow biography or history file should never hold up the object view. */
+const LONG_TEXT_TIMEOUT_MS = 5000;
+
 const FALLBACK_FILE_CACHE_CONTROL = 'public, max-age=86400';
 
 const fileCacheControl = (upstream: string | undefined): string =>
@@ -209,6 +213,19 @@ export class DocumentController {
     });
   }
 
+  /**
+   * A biography or history text. Rare, and not always readable upstream, so any
+   * failure leaves the text out rather than failing the whole object view.
+   */
+  private async fetchLongText(url: string): Promise<string | undefined> {
+    try {
+      const res = await this.apiService.get<string>({ url, responseType: 'text', timeout: LONG_TEXT_TIMEOUT_MS });
+      return cleanHtml(res.data);
+    } catch {
+      return undefined;
+    }
+  }
+
   // Validate and extract the numeric suffix from a composite document ID like
   // "publ-123" or "film-456". Throws 400 if the suffix is not a positive integer.
   private extractNumericId(compositeId: string, prefix: string): string {
@@ -273,7 +290,10 @@ export class DocumentController {
     if (id.startsWith('person-')) {
       const personId = this.extractNumericId(id, 'person-');
       const res = await this.apiService.get<Person>({ url: `${base}/${MUNICIPALITY_ID}/persons/${personId}` });
-      return response.send({ data: mapPersonToDocument(res.data), message: 'success' });
+      const longText = res.data.biographyFilename
+        ? await this.fetchLongText(`${base}/${MUNICIPALITY_ID}/persons/${personId}/biography`)
+        : undefined;
+      return response.send({ data: { ...mapPersonToDocument(res.data), longText }, message: 'success' });
     }
 
     if (id.startsWith('jurpers-')) {
@@ -281,7 +301,10 @@ export class DocumentController {
       const res = await this.apiService.get<LegalEntityRecord>({
         url: `${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}`,
       });
-      return response.send({ data: mapLegalEntityToDocument(res.data), message: 'success' });
+      const longText = res.data.historyFilename
+        ? await this.fetchLongText(`${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}/history`)
+        : undefined;
+      return response.send({ data: { ...mapLegalEntityToDocument(res.data), longText }, message: 'success' });
     }
 
     if (id.startsWith('sjoman-')) {

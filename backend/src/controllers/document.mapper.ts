@@ -166,6 +166,8 @@ export interface Document {
   relatedIds?: string[];
   // Labelled rows for the registers, whose fields do not fit the document shape above.
   details?: DetailRow[];
+  // Cleaned HTML: a person's biography or a legal entity's history.
+  longText?: string;
 }
 
 export interface DetailRow {
