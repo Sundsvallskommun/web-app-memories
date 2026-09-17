@@ -165,7 +165,7 @@ export class DocumentController {
 
     const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/objects?${params.toString()}`;
     const res = await this.apiService.get<CombinedObjectResponse>({ url });
-    const { objects = [], typeCounts, categoryCounts = [], _meta } = res.data;
+    const { objects = [], typeCounts, categoryCounts = [], topographyCounts = [], _meta } = res.data;
 
     return response.send({
       data: mapCombinedObjectsToDocuments(objects),
@@ -181,6 +181,7 @@ export class DocumentController {
       censusTotal: countFor(typeCounts, 'Mantal'),
       seamanTotal: countFor(typeCounts, 'Sjöman'),
       categoryCounts: categoryCounts.map(({ categoryId, name, count }) => ({ id: categoryId, name, count })),
+      placeCounts: topographyCounts.map(({ topographyId, name, count }) => ({ id: topographyId, name, count })),
       page: _meta?.page ?? safePage,
       pageSize: _meta?.limit ?? safePageSize,
       message: 'success',

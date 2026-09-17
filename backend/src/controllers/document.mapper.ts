@@ -523,10 +523,18 @@ export interface CategoryCount {
   count: number;
 }
 
+/** Hits per place. Like the category counts, each ignores its own place filter. */
+export interface TopographyCount {
+  topographyId: number;
+  name: string;
+  count: number;
+}
+
 export interface CombinedObjectResponse {
   objects: CombinedObject[];
   typeCounts: TypeCount[];
   categoryCounts?: CategoryCount[];
+  topographyCounts?: TopographyCount[];
   _meta: PagingMetaData;
 }
 
