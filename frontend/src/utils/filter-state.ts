@@ -3,7 +3,7 @@ import { Organisation } from '@services/organisation-service';
 import { Place } from '@services/place-service';
 
 export const TYPES: DocumentType[] = ['Film', 'Publication', 'Photo', 'Object', 'Audio', 'Text'];
-export const REGISTERS: DocumentType[] = ['Person', 'Census', 'Seaman'];
+export const REGISTERS: DocumentType[] = ['Person', 'Census', 'Seaman', 'LegalEntity'];
 export const GENDERED_REGISTERS: DocumentType[] = ['Person', 'Census'];
 export const ALL_TYPES: DocumentType[] = [...TYPES, ...REGISTERS];
 
@@ -12,7 +12,7 @@ export const TYPES_SUPPORTING: Record<'gender' | 'creator' | 'place' | 'organisa
   creator: TYPES,
   organisation: TYPES,
   category: TYPES,
-  place: TYPES,
+  place: [...TYPES, 'LegalEntity'],
 };
 
 export type ScopedFilter = 'gender' | 'creator';

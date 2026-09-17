@@ -8,7 +8,8 @@ export type DocumentType =
   | 'Text'
   | 'Person'
   | 'Census'
-  | 'Seaman';
+  | 'Seaman'
+  | 'LegalEntity';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Film: 'Film',
@@ -20,6 +21,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Person: 'Person',
   Census: 'Mantal',
   Seaman: 'Sjöman',
+  LegalEntity: 'Juridisk person',
 };
 
 export interface DocumentFile {
@@ -132,6 +134,7 @@ export interface SearchResult {
   personTotal: number;
   censusTotal: number;
   seamanTotal: number;
+  legalEntityTotal: number;
   categoryCounts: CategoryCount[];
   placeCounts: PlaceCount[];
 }

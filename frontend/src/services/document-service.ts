@@ -15,6 +15,7 @@ interface ApiResponse {
   personTotal: number;
   censusTotal: number;
   seamanTotal: number;
+  legalEntityTotal?: number;
   categoryCounts?: CategoryCount[];
   placeCounts?: PlaceCount[];
   page: number;
@@ -60,6 +61,7 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
     personTotal: data?.personTotal || 0,
     censusTotal: data?.censusTotal || 0,
     seamanTotal: data?.seamanTotal || 0,
+    legalEntityTotal: data?.legalEntityTotal || 0,
     categoryCounts: data?.categoryCounts ?? [],
     placeCounts: data?.placeCounts ?? [],
   };

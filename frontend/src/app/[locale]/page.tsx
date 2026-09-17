@@ -307,6 +307,7 @@ const SearchPage: React.FC = () => {
     if (type === 'Person') return result.personTotal;
     if (type === 'Census') return result.censusTotal;
     if (type === 'Seaman') return result.seamanTotal;
+    if (type === 'LegalEntity') return result.legalEntityTotal;
     return 0;
   };
 

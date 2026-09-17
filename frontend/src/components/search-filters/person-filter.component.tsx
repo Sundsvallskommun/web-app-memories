@@ -16,7 +16,7 @@ interface Props {
   onToggleRegister: (type: DocumentType) => void;
   gender?: string;
   onGenderChange: (gender?: string) => void;
-  /** Ticks all three registers, or clears them when they are already all on. */
+  /** Ticks all registers, or clears them when they are already all on. */
   onToggleAllRegisters: () => void;
 }
 
