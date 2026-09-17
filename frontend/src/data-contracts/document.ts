@@ -75,6 +75,8 @@ export interface Document {
   // Composite ids of related documents (Photo / FOTO_FOTO). Each links to its
   // own detail page from the "Relaterade foton" strip.
   relatedIds?: string[];
+  // Labelled rows for the registers (Person, Sjöman), shown instead of the document rows.
+  details?: { label: string; value: string }[];
 }
 
 /** A category the creating organisations are grouped into, Verksamhetskategori. */

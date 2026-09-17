@@ -18,13 +18,17 @@ import { DownloadError, downloadDocumentFile } from '@utils/download-file';
 // (archiveCollection is declared upstream but never populated), Skapad and
 // Uppdaterat (no upstream column at all). They are left out rather than
 // rendered as permanently empty rows. Add them here when the API grows them.
-const metaRows = (doc: Document): { label: string; value: string }[] =>
-  [
-    { label: 'Objekt typ', value: DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type },
+const metaRows = (doc: Document): { label: string; value: string }[] => {
+  const typeRow = { label: 'Objekt typ', value: DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type };
+  if (doc.details?.length) return [typeRow, ...doc.details];
+
+  return [
+    typeRow,
     { label: 'Upphovsman', value: doc.creator },
     { label: 'Plats', value: doc.location },
     { label: 'Tidpunkt', value: doc.year ? String(doc.year) : '' },
   ].filter((row) => !!row.value);
+};
 
 const FILE_BEARING_TYPES = new Set(['Photo', 'Object', 'Film', 'Audio', 'Text', 'Publication']);
 
