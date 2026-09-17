@@ -14,10 +14,9 @@ import { DocumentGallery } from '@components/document-gallery/document-gallery.c
 import { DocumentRelated } from '@components/document-related/document-related.component';
 import { DownloadError, downloadDocumentFile } from '@utils/download-file';
 
-// Fields the design asks for that the API does not carry: Samling
-// (archiveCollection is declared upstream but never populated), Skapad and
-// Uppdaterat (no upstream column at all). They are left out rather than
-// rendered as permanently empty rows. Add them here when the API grows them.
+// Fields the design asks for that the API does not carry: Skapad and Uppdaterat
+// (no upstream column at all). They are left out rather than rendered as
+// permanently empty rows. Add them here when the API grows them.
 const metaRows = (doc: Document): { label: string; value: string }[] => {
   const typeRow = { label: 'Objekt typ', value: DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type };
   if (doc.details?.length) return [typeRow, ...doc.details];
@@ -124,6 +123,7 @@ const DocumentDetailPage: React.FC = () => {
   }
 
   const title = doc.title || '(Utan titel)';
+  const hasTopBlock = FILE_BEARING_TYPES.has(doc.type) || !!doc.description || !!primaryFile || !!downloadError;
 
   return (
     <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
@@ -139,41 +139,43 @@ const DocumentDetailPage: React.FC = () => {
           </Breadcrumb>
           <h1 className="sr-only">{title}</h1>
           <div className="bg-background-200 rounded-cards px-16 py-24 flex flex-col gap-32 md:px-72 md:py-40">
-            <div className="flex flex-col items-center gap-16">
-              <DocumentPreview doc={doc} />
+            {hasTopBlock && (
+              <div className="flex flex-col items-center gap-16">
+                <DocumentPreview doc={doc} />
 
-              {isMissingItsFile(doc) && (
-                <p className="text-center text-dark-secondary" data-cy="document-no-file">
-                  Det finns ingen digitaliserad fil för det här objektet. Uppgifterna nedan kommer från arkivets
-                  katalog.
-                </p>
-              )}
+                {isMissingItsFile(doc) && (
+                  <p className="text-center text-dark-secondary" data-cy="document-no-file">
+                    Det finns ingen digitaliserad fil för det här objektet. Uppgifterna nedan kommer från arkivets
+                    katalog.
+                  </p>
+                )}
 
-              {doc.description && <p className="text-center font-bold">{doc.description}</p>}
+                {doc.description && <p className="text-center font-bold">{doc.description}</p>}
 
-              {primaryFile && (
-                <Button
-                  color="primary"
-                  rightIcon={<Download size={16} />}
-                  onClick={handleDownload}
-                  loading={downloading}
-                  data-cy="document-download"
-                >
-                  Ladda ned
-                </Button>
-              )}
+                {primaryFile && (
+                  <Button
+                    color="primary"
+                    rightIcon={<Download size={16} />}
+                    onClick={handleDownload}
+                    loading={downloading}
+                    data-cy="document-download"
+                  >
+                    Ladda ned
+                  </Button>
+                )}
 
-              {downloadError && (
-                <div role="alert" className="w-full max-w-2xl">
-                  <Alert type="warning">
-                    <Alert.Icon />
-                    <Alert.Content>
-                      <Alert.Content.Description>{downloadError}</Alert.Content.Description>
-                    </Alert.Content>
-                  </Alert>
-                </div>
-              )}
-            </div>
+                {downloadError && (
+                  <div role="alert" className="w-full max-w-2xl">
+                    <Alert type="warning">
+                      <Alert.Icon />
+                      <Alert.Content>
+                        <Alert.Content.Description>{downloadError}</Alert.Content.Description>
+                      </Alert.Content>
+                    </Alert>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col gap-16">
               <h2 className="text-h4-md">Detaljer</h2>
