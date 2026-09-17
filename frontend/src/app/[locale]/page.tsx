@@ -337,6 +337,7 @@ const SearchPage: React.FC = () => {
               filters={currentFilters}
               countFor={getTypeCount}
               categoryCounts={result?.categoryCounts ?? []}
+              placeCounts={result?.placeCounts}
               onChange={applyState}
             />
           </div>

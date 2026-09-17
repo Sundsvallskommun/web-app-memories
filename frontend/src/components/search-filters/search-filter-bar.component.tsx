@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@sk-web-gui/react';
 import { ListFilter } from 'lucide-react';
-import { CategoryCount, DOCUMENT_TYPE_LABELS, DocumentType } from '@data-contracts/document';
+import { CategoryCount, DOCUMENT_TYPE_LABELS, DocumentType, PlaceCount } from '@data-contracts/document';
 import { FilterModal, FilterRow } from '@components/search-filters/filter-modal.component';
 import { CategoryFilter, CategoryFilterBody } from '@components/search-filters/category-filter.component';
 import { FilterItem, FilterOverflowRow } from '@components/search-filters/filter-overflow-row.component';
@@ -35,10 +35,11 @@ interface Props {
   filters: FilterState;
   countFor: (type: DocumentType) => number;
   categoryCounts: CategoryCount[];
+  placeCounts?: PlaceCount[];
   onChange: (next: FilterState) => void;
 }
 
-export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCounts, onChange }) => {
+export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCounts, placeCounts, onChange }) => {
   const isMobile = useMediaQuery(BELOW_MD);
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState<FilterState>(EMPTY_FILTERS);
@@ -84,7 +85,13 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCo
     },
     {
       key: 'place',
-      node: <PlaceFilter selected={filters.places} onToggle={(place) => onChange(togglePlace(filters, place))} />,
+      node: (
+        <PlaceFilter
+          counts={placeCounts}
+          selected={filters.places}
+          onToggle={(place) => onChange(togglePlace(filters, place))}
+        />
+      ),
     },
     {
       key: 'creator',
@@ -159,7 +166,12 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCo
       label: 'Plats',
       summary: draft.places.map((place) => place.name).join(', ') || NOTHING,
       body: (
-        <PlaceFilterBody selected={draft.places} onToggle={(place) => setDraft(togglePlace(draft, place))} hideLabel />
+        <PlaceFilterBody
+          counts={placeCounts}
+          selected={draft.places}
+          onToggle={(place) => setDraft(togglePlace(draft, place))}
+          hideLabel
+        />
       ),
     },
     {

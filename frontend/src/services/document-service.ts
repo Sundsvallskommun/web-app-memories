@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { CategoryCount, Document, SearchParams, SearchResult } from '@data-contracts/document';
+import { CategoryCount, Document, PlaceCount, SearchParams, SearchResult } from '@data-contracts/document';
 import { apiService } from '@services/api-service';
 
 interface ApiResponse {
@@ -16,6 +16,7 @@ interface ApiResponse {
   censusTotal: number;
   seamanTotal: number;
   categoryCounts?: CategoryCount[];
+  placeCounts?: PlaceCount[];
   page: number;
   pageSize: number;
   message: string;
@@ -60,6 +61,7 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
     censusTotal: data?.censusTotal || 0,
     seamanTotal: data?.seamanTotal || 0,
     categoryCounts: data?.categoryCounts ?? [],
+    placeCounts: data?.placeCounts ?? [],
   };
 };
 

@@ -87,6 +87,12 @@ export interface CategoryCount extends Category {
   count: number;
 }
 
+export interface PlaceCount {
+  id: number;
+  name: string;
+  count: number;
+}
+
 export interface SearchParams {
   query?: string;
   types?: DocumentType[];
@@ -125,4 +131,5 @@ export interface SearchResult {
   censusTotal: number;
   seamanTotal: number;
   categoryCounts: CategoryCount[];
+  placeCounts: PlaceCount[];
 }
