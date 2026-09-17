@@ -11,7 +11,6 @@ const MIN_TERM = 2;
 const MAX_MATCHES = 50;
 
 interface Props {
-  /** Hits per place in the current search, or undefined before the first answer. */
   counts?: PlaceCount[];
   selected: Place[];
   onToggle: (place: Place) => void;

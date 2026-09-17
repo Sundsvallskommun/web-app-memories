@@ -708,18 +708,34 @@ export interface CensusRecord {
   farmNumber: string | null;
   householdNumber: string | null;
   occupationRelation: string | null;
+  orderNumber: string | null;
+  serialNumber: string | null;
 }
 
 export const mapCensusRecordToDocument = (record: CensusRecord): Document => ({
   id: `mantal-${record.id}`,
-  title: [record.firstName, record.lastName].filter(Boolean).join(' '),
+  title: [opt(record.firstName), opt(record.lastName)].filter(Boolean).join(' '),
   type: 'Census',
   year: parseYear(record.birthYear),
   location: '',
   creator: '',
-  description: [record.occupationRelation, record.note].filter(Boolean).join(' — '),
+  description: '',
   accnr: opt(record.objectNumber),
   source: opt(record.source),
+  details: detailRows([
+    ['Förnamn', opt(record.firstName)],
+    ['Efternamn', opt(record.lastName)],
+    ['Kön', opt(record.gender)],
+    ['Födelsedatum', archiveDate(record.birthYear)],
+    ['Yrke/relation', opt(record.occupationRelation)],
+    ['Mantalsår', opt(record.source)],
+    ['Gårdsnummer', opt(record.farmNumber)],
+    ['Hushållsnummer', opt(record.householdNumber)],
+    ['Ordning i hushållet', opt(record.orderNumber)],
+    ['Löpnummer', record.serialNumber === '0' ? undefined : opt(record.serialNumber)],
+    ['Anteckning', opt(record.note)],
+    ['Objektnummer', opt(record.objectNumber)],
+  ]),
 });
 
 /**
