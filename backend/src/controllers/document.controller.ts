@@ -1,4 +1,5 @@
 import { Controller, Get, HeaderParam, Param, QueryParam, Res } from 'routing-controllers';
+import { OpenAPI } from 'routing-controllers-openapi';
 import { Response } from 'express';
 import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
@@ -116,6 +117,7 @@ export class DocumentController {
    * page of results costs exactly one request no matter how many types match.
    */
   @Get('/documents')
+  @OpenAPI({ summary: 'Search objects and registers with filters, sorting and counts per type and category' })
   async searchDocuments(
     @QueryParam('query') query: string,
     @QueryParam('page') page: number = 1,
@@ -195,6 +197,7 @@ export class DocumentController {
    * Fetch a single document by composite id (film-N / publ-N / photo-N).
    */
   @Get('/documents/:id')
+  @OpenAPI({ summary: 'Get one object or register record by its composite id' })
   async getDocumentById(@Param('id') id: string, @Res() response: Response) {
     const base = getApiBase('memories');
 
@@ -248,6 +251,7 @@ export class DocumentController {
    * the same way Logbook OOMs the upstream when it wraps the response.
    */
   @Get('/documents/:id/file')
+  @OpenAPI({ summary: 'Get the file of an object in the requested variant' })
   async getDocumentFile(
     @Param('id') id: string,
     @QueryParam('variant') variant: string,
@@ -303,6 +307,7 @@ export class DocumentController {
    * per-media endpoint (`/texts/{id}/media/{mediaId}/file`) added in memories 3.4.
    */
   @Get('/documents/:id/media/:mediaId/file')
+  @OpenAPI({ summary: 'Get one extra media file of a text' })
   async getDocumentMediaFile(
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
@@ -350,6 +355,7 @@ export class DocumentController {
    * on `/file` directly so the browser can render them in-page.)
    */
   @Get('/documents/:id/stream')
+  @OpenAPI({ summary: 'Stream the audio or film of an object' })
   async streamDocument(@Param('id') id: string, @HeaderParam('range') range: string, @Res() response: Response) {
     const base = getApiBase('memories');
     let url: string;
