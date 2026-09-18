@@ -85,7 +85,7 @@ export const PersonFilter: React.FC<Props> = (props) => (
         Person
       </PopupMenu.Button>
 
-      <PopupMenu.Panel className="w-[260px]">
+      <PopupMenu.Panel className="w-[320px]">
         <PersonFilterBody {...props} />
       </PopupMenu.Panel>
     </PopupMenu>

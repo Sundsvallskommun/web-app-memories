@@ -79,10 +79,8 @@ export const PlaceFilterBody: React.FC<BodyProps> = ({ selected, onToggle, hideL
 
       {!loading && failed && <p className="text-label-small text-dark-secondary">Platserna kunde inte hämtas.</p>}
 
-      {!loading && !failed && options.length === 0 && (
-        <p className="text-label-small text-dark-secondary">
-          {term.trim().length < MIN_TERM ? 'Skriv minst två tecken.' : 'Inga platser matchar.'}
-        </p>
+      {!loading && !failed && options.length === 0 && term.trim().length >= MIN_TERM && (
+        <p className="text-label-small text-dark-secondary">Inga platser matchar.</p>
       )}
 
       {options.length > 0 && (

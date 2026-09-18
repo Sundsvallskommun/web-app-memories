@@ -43,7 +43,7 @@ export const TypeFilter: React.FC<Props> = (props) => (
         Typ
       </PopupMenu.Button>
 
-      <PopupMenu.Panel className="w-[260px]">
+      <PopupMenu.Panel className="w-[320px]">
         <TypeFilterBody {...props} />
       </PopupMenu.Panel>
     </PopupMenu>

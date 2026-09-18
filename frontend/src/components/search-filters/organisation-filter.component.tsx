@@ -74,10 +74,8 @@ export const OrganisationFilterBody: React.FC<BodyProps> = ({ selected, onToggle
         </div>
       )}
 
-      {!searching && options.length === 0 && (
-        <p className="text-label-small text-dark-secondary">
-          {term.trim().length < MIN_TERM ? 'Skriv minst två tecken.' : 'Inga institutioner matchar.'}
-        </p>
+      {!searching && options.length === 0 && term.trim().length >= MIN_TERM && (
+        <p className="text-label-small text-dark-secondary">Inga institutioner matchar.</p>
       )}
 
       {options.length > 0 && (
