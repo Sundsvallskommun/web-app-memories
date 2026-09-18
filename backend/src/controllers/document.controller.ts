@@ -32,8 +32,8 @@ import {
 //
 // This replaces a six-way fan-out that page-walked each collection separately
 // and held the whole corpus in memory to sort and slice it. That approach cost
-// ~36 upstream requests per distinct query against a per-minute quota, and it
-// could only produce accurate totals by fetching everything first.
+// dozens of upstream requests per distinct query against a per-minute quota, and
+// it could only produce accurate totals by fetching everything first.
 
 /** Upstream sort fields. Anything else is dropped rather than substituted. */
 const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType', 'location']);
@@ -69,8 +69,8 @@ const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
 
 /**
  * The registers that carry a gender. Sjöman is deliberately absent: the source
- * has no such column for seamen, so a gender filter silently drops all 116 094
- * of them however it is applied.
+ * has no such column for seamen, so a gender filter silently drops all of them
+ * however it is applied.
  */
 const GENDERED_OBJECT_TYPES = ['Person', 'Mantal'];
 
@@ -154,7 +154,7 @@ export class DocumentController {
     appendIds(params, 'topographyId', place);
     if (creator?.trim()) params.set('creator', creator.trim());
     // Only the person registers record a gender, so this also excludes every
-    // document type and all 116k seamen, who have no such column upstream.
+    // document type and all seamen, who have no such column upstream.
     if (gender?.trim()) params.set('gender', gender.trim());
     appendIds(params, 'creatorLegalEntityId', organisation);
     appendIds(params, 'categoryId', category);
@@ -248,7 +248,7 @@ export class DocumentController {
   /**
    * Pipe a file from the upstream samba share through this proxy without
    * buffering. Important for the Film endpoint where individual records can
-   * be 40+ MB AVI files — buffering them in memory would OOM the proxy in
+   * be large AVI files — buffering them in memory would OOM the proxy in
    * the same way Logbook OOMs the upstream when it wraps the response.
    */
   @Get('/documents/:id/file')

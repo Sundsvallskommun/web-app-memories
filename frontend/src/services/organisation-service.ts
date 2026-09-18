@@ -18,7 +18,7 @@ interface SingleResponse {
 
 /**
  * Search organisations by name. Returns nothing for an empty term: there are
- * 6 607 of them, orderable only by name, so a default list opens on obscure
+ * thousands of them, orderable only by name, so a default list opens on obscure
  * businesses rather than anything a user would pick.
  */
 export const searchOrganisations = async (name: string): Promise<Organisation[]> => {
