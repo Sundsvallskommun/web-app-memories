@@ -59,7 +59,7 @@ export const PlaceFilterBody: React.FC<BodyProps> = ({ counts, selected, onToggl
   const matches = matchesFor(places, term);
   const unlisted = selected.filter((option) => !matches.some((match) => match.id === option.id));
   const options = [...unlisted, ...matches];
-  const hitsById = new Map((counts ?? []).map((place) => [place.id, place.count]));
+  const hitsById = new Map<number, number>((counts ?? []).map((place) => [place.id, place.count]));
   const labelFor = (place: Place) => (counts ? `${place.name} (${hitsById.get(place.id) ?? 0})` : place.name);
 
   return (
