@@ -8,9 +8,9 @@ const TEXT_TAGS = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', '
  * divs for the second pass to drop.
  */
 const blockFromDivStyle: sanitizeHtml.Transformer = (tagName, attribs) => {
-  const style = (attribs.style ?? '').replace(/\s/g, '').toLowerCase();
-  if (style.includes('font-weight:bold')) return { tagName: 'h3', attribs: {} };
-  if (style.includes('font-family')) return { tagName: 'p', attribs: {} };
+  const style = attribs.style ?? '';
+  if (/font-weight\s*:\s*bold/i.test(style)) return { tagName: 'h3', attribs: {} };
+  if (/font-family/i.test(style)) return { tagName: 'p', attribs: {} };
   return { tagName, attribs: {} };
 };
 

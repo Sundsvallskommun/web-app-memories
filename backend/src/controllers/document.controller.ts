@@ -215,7 +215,8 @@ export class DocumentController {
    * A biography or history text. Rare, and not always readable upstream, so any
    * failure leaves the text out rather than failing the whole object view.
    */
-  private async fetchLongText(url: string): Promise<string | undefined> {
+  private async fetchLongText(filename: string | null, url: string): Promise<string | undefined> {
+    if (!filename) return undefined;
     try {
       const res = await this.apiService.get<string>({ url, responseType: 'text', timeout: LONG_TEXT_TIMEOUT_MS });
       return cleanHtml(res.data);
@@ -289,9 +290,10 @@ export class DocumentController {
     if (id.startsWith('person-')) {
       const personId = this.extractNumericId(id, 'person-');
       const res = await this.apiService.get<Person>({ url: `${base}/${MUNICIPALITY_ID}/persons/${personId}` });
-      const longText = res.data.biographyFilename
-        ? await this.fetchLongText(`${base}/${MUNICIPALITY_ID}/persons/${personId}/biography`)
-        : undefined;
+      const longText = await this.fetchLongText(
+        res.data.biographyFilename,
+        `${base}/${MUNICIPALITY_ID}/persons/${personId}/biography`,
+      );
       return response.send({ data: { ...mapPersonToDocument(res.data), longText }, message: 'success' });
     }
 
@@ -300,9 +302,10 @@ export class DocumentController {
       const res = await this.apiService.get<LegalEntityRecord>({
         url: `${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}`,
       });
-      const longText = res.data.historyFilename
-        ? await this.fetchLongText(`${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}/history`)
-        : undefined;
+      const longText = await this.fetchLongText(
+        res.data.historyFilename,
+        `${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}/history`,
+      );
       return response.send({ data: { ...mapLegalEntityToDocument(res.data), longText }, message: 'success' });
     }
 
