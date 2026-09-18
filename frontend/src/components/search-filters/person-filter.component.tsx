@@ -2,6 +2,7 @@
 
 import { Divider, Filter, FormLabel, PopupMenu, RadioButton } from '@sk-web-gui/react';
 import { ChevronDown } from 'lucide-react';
+import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
 import { DOCUMENT_TYPE_LABELS, DocumentType } from '@data-contracts/document';
 import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-alignment';
 
@@ -74,7 +75,13 @@ export const PersonFilterBody: React.FC<Props> = ({
 export const PersonFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu>
-      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="person-filter">
+      <PopupMenu.Button
+        size="sm"
+        variant="ghost"
+        rightIcon={<ChevronDown size={18} />}
+        className={OPEN_FILTER_BUTTON_CLASS}
+        data-cy="person-filter"
+      >
         Person
       </PopupMenu.Button>
 

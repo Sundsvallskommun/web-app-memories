@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Filter, FormLabel, Input, PopupMenu, Spinner } from '@sk-web-gui/react';
 import { ChevronDown } from 'lucide-react';
+import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
 import { Organisation, searchOrganisations } from '@services/organisation-service';
 import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-alignment';
 
@@ -101,7 +102,13 @@ export const OrganisationFilterBody: React.FC<BodyProps> = ({ selected, onToggle
 export const OrganisationFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu type="dialog">
-      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="organisation-filter">
+      <PopupMenu.Button
+        size="sm"
+        variant="ghost"
+        rightIcon={<ChevronDown size={18} />}
+        className={OPEN_FILTER_BUTTON_CLASS}
+        data-cy="organisation-filter"
+      >
         Institution
       </PopupMenu.Button>
 

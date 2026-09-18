@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button, FormControl, FormLabel, PopupMenu } from '@sk-web-gui/react';
 import { ChevronDown } from 'lucide-react';
+import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
 import { YearPicker } from '@components/search-filters/year-picker.component';
 
 interface Props {
@@ -80,7 +81,13 @@ export const PeriodFilterBody: React.FC<BodyProps> = ({ yearFrom, yearTo, onAppl
 export const PeriodFilter: React.FC<Props> = ({ yearFrom, yearTo, onApply }) => (
   <div className="relative">
     <PopupMenu type="dialog">
-      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="period-filter">
+      <PopupMenu.Button
+        size="sm"
+        variant="ghost"
+        rightIcon={<ChevronDown size={18} />}
+        className={OPEN_FILTER_BUTTON_CLASS}
+        data-cy="period-filter"
+      >
         Tidsperiod
       </PopupMenu.Button>
 
