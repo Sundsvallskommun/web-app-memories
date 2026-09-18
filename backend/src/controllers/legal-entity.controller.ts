@@ -42,8 +42,6 @@ export class LegalEntityController {
     @Res() response: Response,
   ) {
     const trimmed = name?.trim();
-    // Without a term the only available ordering is alphabetical, which is
-    // useless as a starting list, so say so rather than returning noise.
     if (!trimmed) {
       return response.send({ data: [], total: 0, message: 'success' });
     }

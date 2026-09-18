@@ -6,7 +6,6 @@ import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-al
 import { Category, CategoryCount } from '@data-contracts/document';
 
 interface Props {
-  /** The categories with hits in the current search. */
   counts: CategoryCount[];
   selected: Category[];
   onToggle: (category: Category) => void;

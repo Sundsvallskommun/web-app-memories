@@ -95,8 +95,6 @@ const upstreamObjectTypes = (type: string | undefined, gender: string | undefine
   ];
   if (requested.length > 0) return requested;
 
-  // Only Person and Mantal record a gender, so falling back to the document
-  // types would make a gender filter on its own return nothing at all.
   return gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
 };
 
@@ -153,8 +151,6 @@ export class DocumentController {
 
     appendIds(params, 'topographyId', place);
     if (creator?.trim()) params.set('creator', creator.trim());
-    // Only the person registers record a gender, so this also excludes every
-    // document type and all seamen, who have no such column upstream.
     if (gender?.trim()) params.set('gender', gender.trim());
     appendIds(params, 'creatorLegalEntityId', organisation);
     appendIds(params, 'categoryId', category);

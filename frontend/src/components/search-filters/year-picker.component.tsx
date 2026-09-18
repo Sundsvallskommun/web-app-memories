@@ -29,8 +29,6 @@ export const YearPicker: React.FC<Props> = ({
   const [start, setStart] = useState(() => pageStart(Number(value) || new Date().getFullYear()));
   const wrapper = useRef<HTMLDivElement>(null);
 
-  // Opening lands the grid on whatever is typed, so the year in the field is
-  // the one you see.
   const toggle = () => {
     setOpen((wasOpen) => {
       if (!wasOpen && /^\d{4}$/.test(value.trim())) setStart(pageStart(Number(value)));
@@ -38,7 +36,6 @@ export const YearPicker: React.FC<Props> = ({
     });
   };
 
-  // Close on a click elsewhere or on Escape, like any other popover.
   useEffect(() => {
     if (!open) return;
 

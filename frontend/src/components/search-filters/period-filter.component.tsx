@@ -21,7 +21,6 @@ const toYear = (raw: string): number | undefined => {
   return /^\d{4}$/.test(trimmed) ? Number(trimmed) : undefined;
 };
 
-/** Empty or a whole year. A half-typed year is neither, so it waits. */
 const isComplete = (raw: string): boolean => raw.trim() === '' || /^\d{4}$/.test(raw.trim());
 
 export const PeriodFilterBody: React.FC<BodyProps> = ({ yearFrom, yearTo, onApply, autoApply, row }) => {

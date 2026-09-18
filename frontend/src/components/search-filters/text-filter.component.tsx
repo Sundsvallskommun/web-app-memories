@@ -6,7 +6,6 @@ import { ChevronDown } from 'lucide-react';
 
 interface Props {
   label: string;
-  /** Optional: omit when it would only repeat the dropdown label. */
   fieldLabel?: string;
   placeholder: string;
   applyLabel: string;
