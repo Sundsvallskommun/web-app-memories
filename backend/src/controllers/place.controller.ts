@@ -1,4 +1,5 @@
 import { Controller, Get, Res } from 'routing-controllers';
+import { OpenAPI } from 'routing-controllers-openapi';
 import { Response } from 'express';
 import { ApiService } from '@services/api.service';
 import { MUNICIPALITY_ID } from '@/config';
@@ -34,6 +35,7 @@ export class PlaceController {
    * browser.
    */
   @Get('/places')
+  @OpenAPI({ summary: 'Get every place in the topography register' })
   async listPlaces(@Res() response: Response) {
     const places = await this.getPlaces();
     return response.send({ data: places, total: places.length, message: 'success' });

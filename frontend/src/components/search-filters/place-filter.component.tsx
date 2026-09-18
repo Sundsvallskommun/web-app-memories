@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Filter, FormLabel, Input, PopupMenu, Spinner } from '@sk-web-gui/react';
 import { ChevronDown } from 'lucide-react';
+import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
 import { Place, getPlaces } from '@services/place-service';
 import { PlaceCount } from '@data-contracts/document';
 import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-alignment';
@@ -82,10 +83,8 @@ export const PlaceFilterBody: React.FC<BodyProps> = ({ counts, selected, onToggl
 
       {!loading && failed && <p className="text-label-small text-dark-secondary">Platserna kunde inte hämtas.</p>}
 
-      {!loading && !failed && options.length === 0 && (
-        <p className="text-label-small text-dark-secondary">
-          {term.trim().length < MIN_TERM ? 'Skriv minst två tecken.' : 'Inga platser matchar.'}
-        </p>
+      {!loading && !failed && options.length === 0 && term.trim().length >= MIN_TERM && (
+        <p className="text-label-small text-dark-secondary">Inga platser matchar.</p>
       )}
 
       {options.length > 0 && (
@@ -115,7 +114,13 @@ export const PlaceFilterBody: React.FC<BodyProps> = ({ counts, selected, onToggl
 export const PlaceFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu type="dialog">
-      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="place-filter">
+      <PopupMenu.Button
+        size="sm"
+        variant="ghost"
+        rightIcon={<ChevronDown size={18} />}
+        className={OPEN_FILTER_BUTTON_CLASS}
+        data-cy="place-filter"
+      >
         Plats
       </PopupMenu.Button>
 

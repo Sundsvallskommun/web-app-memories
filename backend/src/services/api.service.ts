@@ -17,7 +17,7 @@ export interface ApiResponse<T = unknown> {
 //
 // The API gateway enforces a per-minute request quota per client key and answers
 // with `429` + `{"code":"900803","message":"Message throttled out"}` once it is
-// spent. Walking a large collection (publications is 20k+ records) costs more
+// spent. Walking a large collection such as publications costs more
 // requests than one window allows, so a cache warm *will* hit this and simply
 // has to wait for the window to roll over.
 //

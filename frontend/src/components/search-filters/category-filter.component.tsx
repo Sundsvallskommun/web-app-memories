@@ -2,11 +2,11 @@
 
 import { Filter, PopupMenu } from '@sk-web-gui/react';
 import { ChevronDown } from 'lucide-react';
+import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
 import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-alignment';
 import { Category, CategoryCount } from '@data-contracts/document';
 
 interface Props {
-  /** The categories with hits in the current search. */
   counts: CategoryCount[];
   selected: Category[];
   onToggle: (category: Category) => void;
@@ -45,7 +45,13 @@ export const CategoryFilterBody: React.FC<Props> = ({ counts, selected, onToggle
 export const CategoryFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu>
-      <PopupMenu.Button size="sm" variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="category-filter">
+      <PopupMenu.Button
+        size="sm"
+        variant="ghost"
+        rightIcon={<ChevronDown size={18} />}
+        className={OPEN_FILTER_BUTTON_CLASS}
+        data-cy="category-filter"
+      >
         Verksamhetskategori
       </PopupMenu.Button>
 

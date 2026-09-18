@@ -17,7 +17,7 @@ export const TYPES_SUPPORTING: Record<'gender' | 'creator' | 'place' | 'organisa
 
 export type ScopedFilter = 'gender' | 'creator';
 
-/** An empty selection means the six document types, which is what a plain search returns. */
+/** An empty selection means all the document types, which is what a plain search returns. */
 export const supports = (filter: keyof typeof TYPES_SUPPORTING, types: DocumentType[]): boolean =>
   (types.length > 0 ? types : TYPES).every((type) => TYPES_SUPPORTING[filter].includes(type));
 
@@ -54,10 +54,6 @@ export const toggleAllRegisters = (state: FilterState): FilterState => {
   return withTypes(state, allOn ? documentTypes : [...documentTypes, ...REGISTERS]);
 };
 
-/**
- * Sets a filter that only some types carry, narrowing the selection to those.
- * Clearing one leaves the types alone: the user narrowed them for a reason.
- */
 export const setScoped = (state: FilterState, filter: ScopedFilter, value?: string): FilterState => {
   if (!value) return { ...state, [filter]: undefined };
 
@@ -80,8 +76,6 @@ export const toggleOrganisation = (state: FilterState, organisation: Organisatio
   const organisations =
     on ? state.organisations.filter((chosen) => chosen.id !== organisation.id) : [...state.organisations, organisation];
 
-  // Registers have no originator, so an organisation alongside one would
-  // return nothing at all.
   const kept = state.types.filter((type) => TYPES_SUPPORTING.organisation.includes(type));
   return { ...state, organisations, types: organisations.length > 0 ? kept : state.types };
 };
@@ -101,7 +95,6 @@ export const setPeriod = (state: FilterState, yearFrom?: number, yearTo?: number
   yearTo,
 });
 
-/** The whole state as URL parameters, every key present so cleared ones are removed. */
 export const filterParams = (state: FilterState): Record<string, string | undefined> => ({
   type: state.types.length > 0 ? state.types.join(',') : undefined,
   from: state.yearFrom ? String(state.yearFrom) : undefined,

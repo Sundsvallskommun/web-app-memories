@@ -48,21 +48,25 @@ export const FilterModal: React.FC<Props> = ({ show, rows, onReset, onApply, onC
         show={show}
         onClose={close}
         label="Välj filter"
-        className="fixed bottom-0 left-0 max-h-[95vh] w-full rounded-0 rounded-t-cards"
+        labelAs="h2"
+        closeLabel="Stäng"
+        closeButtonProps={{ showBackground: true }}
+        className="fixed bottom-0 left-0 max-h-[95vh] w-full !gap-0 rounded-0 rounded-t-16"
         data-cy="filters-modal"
       >
-        <Modal.Content className="min-h-0 overflow-y-auto pl-10">
-          <Accordion>
+        <Modal.Content className="min-h-0 overflow-y-auto !pb-0 !pt-36">
+          <Accordion size="sm" className="border-t-1 border-divider">
             {rows.map((row) => (
               <Accordion.Item
                 key={row.key}
                 open={openRow === row.key}
                 onToggleOpen={(open) => setRowOpen(row.key, open)}
+                className="flow-root border-b-1 border-divider [&>.sk-disclosure]:border-b-0"
               >
-                <Accordion.Item.Header>
+                <Accordion.Item.Header className="!h-auto py-4">
                   <Accordion.Item.Title>
                     <span className="flex flex-col gap-6 text-left">
-                      <span className="text-h4-sm">{row.label}</span>
+                      <span className="font-header text-h4-sm">{row.label}</span>
                       <span className="text-small font-normal text-dark-secondary">{row.summary}</span>
                     </span>
                   </Accordion.Item.Title>
@@ -70,15 +74,17 @@ export const FilterModal: React.FC<Props> = ({ show, rows, onReset, onApply, onC
                     {(open: boolean) => <Icon icon={open ? <ChevronUp /> : <ChevronDown />} />}
                   </Accordion.Item.Button>
                 </Accordion.Item.Header>
-                <Accordion.Item.Content>{row.body}</Accordion.Item.Content>
+                <Accordion.Item.Content className="!mb-0 !mr-0 aria-[hidden=false]:!pt-16 !px-10">
+                  {row.body}
+                </Accordion.Item.Content>
               </Accordion.Item>
             ))}
           </Accordion>
         </Modal.Content>
 
-        <Modal.Footer>
-          <div className="flex w-full gap-16">
-            <Button size="lg" variant="secondary" className="flex-1" onClick={onReset} data-cy="filters-reset">
+        <Modal.Footer className="pt-46">
+          <div className="flex w-full flex-wrap gap-16">
+            <Button size="lg" variant="primary" className="flex-1" onClick={onReset} data-cy="filters-reset">
               Nollställ filter
             </Button>
             <Button size="lg" variant="primary" className="flex-1" onClick={apply} data-cy="filters-apply">
