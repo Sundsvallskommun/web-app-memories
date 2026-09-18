@@ -192,7 +192,7 @@ const DocumentDetailPage: React.FC = () => {
               <div className="flex flex-col gap-16" data-cy="document-long-text">
                 <h2 className="text-h4-md">{doc.type === 'LegalEntity' ? 'Historik' : 'Biografi'}</h2>
                 <div
-                  className="max-w-prose [&_a]:underline [&_h3]:mb-8 [&_h3]:text-h4-sm [&_h4]:mb-8 [&_h4]:font-bold [&_li]:mb-4 [&_ol]:list-decimal [&_ol]:pl-24 [&_p]:mb-12 [&_ul]:list-disc [&_ul]:mb-12 [&_ul]:pl-24"
+                  className="[&_a]:underline [&_h3]:mb-8 [&_h3]:text-h4-sm [&_h4]:mb-8 [&_h4]:font-bold [&_li]:mb-4 [&_ol]:list-decimal [&_ol]:pl-24 [&_p]:mb-12 [&_ul]:list-disc [&_ul]:mb-12 [&_ul]:pl-24"
                   dangerouslySetInnerHTML={{ __html: doc.longText }}
                 />
               </div>
