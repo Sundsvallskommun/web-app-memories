@@ -5,12 +5,14 @@ import { Filter, FormLabel, Input, PopupMenu, Spinner } from '@sk-web-gui/react'
 import { ChevronDown } from 'lucide-react';
 import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
 import { Place, getPlaces } from '@services/place-service';
+import { PlaceCount } from '@data-contracts/document';
 import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-alignment';
 
 const MIN_TERM = 2;
 const MAX_MATCHES = 50;
 
 interface Props {
+  counts?: PlaceCount[];
   selected: Place[];
   onToggle: (place: Place) => void;
 }
@@ -29,7 +31,7 @@ const matchesFor = (places: Place[], term: string): Place[] => {
   return [...startsWith, ...rest].slice(0, MAX_MATCHES);
 };
 
-export const PlaceFilterBody: React.FC<BodyProps> = ({ selected, onToggle, hideLabel }) => {
+export const PlaceFilterBody: React.FC<BodyProps> = ({ counts, selected, onToggle, hideLabel }) => {
   const [term, setTerm] = useState('');
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,8 @@ export const PlaceFilterBody: React.FC<BodyProps> = ({ selected, onToggle, hideL
   const matches = matchesFor(places, term);
   const unlisted = selected.filter((option) => !matches.some((match) => match.id === option.id));
   const options = [...unlisted, ...matches];
+  const hitsById = new Map<number, number>((counts ?? []).map((place) => [place.id, place.count]));
+  const labelFor = (place: Place) => (counts ? `${place.name} (${hitsById.get(place.id) ?? 0})` : place.name);
 
   return (
     <div className="flex flex-col gap-8">
@@ -94,7 +98,7 @@ export const PlaceFilterBody: React.FC<BodyProps> = ({ selected, onToggle, hideL
               onChange={() => onToggle(option)}
             >
               <span className="flex flex-col">
-                <span>{option.name}</span>
+                <span>{labelFor(option)}</span>
                 {option.municipality && (
                   <span className="text-label-small text-dark-secondary">{option.municipality}</span>
                 )}

@@ -37,6 +37,7 @@ export interface Publication {
   largeImageFilename: string | null;
   ocrFilename: string | null;
   xmltext: string | null;
+  nodeId?: number | null;
 }
 
 export interface Audio {
@@ -51,6 +52,7 @@ export interface Audio {
   subject: string | null;
   comment: string | null;
   audioMimeType: string | null;
+  nodeId?: number | null;
 }
 
 export interface Photo {
@@ -78,6 +80,7 @@ export interface Photo {
   referenceCode: string | null;
   // IDs of related photos via FOTO_FOTO. Only populated on detail lookup.
   relatedPhotoIds: number[] | null;
+  nodeId?: number | null;
 }
 
 export interface TextMediaFile {
@@ -103,6 +106,7 @@ export interface Text {
   ocrFilename: string | null;
   xmltext: string | null;
   mediaFiles: TextMediaFile[] | null;
+  nodeId?: number | null;
 }
 
 export interface DocumentFile {
@@ -160,6 +164,15 @@ export interface Document {
   // Composite ids of related documents (Photo / FOTO_FOTO), shown as a
   // "related" strip on the detail page. Each links to its own detail page.
   relatedIds?: string[];
+  // Labelled rows for the registers, whose fields do not fit the document shape above.
+  details?: DetailRow[];
+  // Cleaned HTML: a person's biography or a legal entity's history.
+  longText?: string;
+}
+
+export interface DetailRow {
+  label: string;
+  value: string;
 }
 
 // The upstream DB uses literal "3000" (and similar future-year strings) as a
@@ -510,6 +523,8 @@ export interface CombinedObject {
   /** Resolved place name from TOPOGRAFI, preferred over locationText. */
   location: string | null;
   creator?: Creator | null;
+  /** The archive node the object sits in. Empty for the registers. */
+  nodeId?: number | null;
 }
 
 export interface TypeCount {
@@ -523,10 +538,17 @@ export interface CategoryCount {
   count: number;
 }
 
+export interface TopographyCount {
+  topographyId: number;
+  name: string;
+  count: number;
+}
+
 export interface CombinedObjectResponse {
   objects: CombinedObject[];
   typeCounts: TypeCount[];
   categoryCounts?: CategoryCount[];
+  topographyCounts?: TopographyCount[];
   _meta: PagingMetaData;
 }
 
@@ -551,6 +573,170 @@ const OBJECT_TYPE_TO_DOCUMENT_TYPE: Record<string, string> = {
 /** The six types that carry documents. The registers are searchable but are not documents. */
 export const DOCUMENT_OBJECT_TYPES = ['Foto', 'Föremål', 'Film', 'Ljud', 'Text', 'Publikation'];
 
+export interface Person {
+  personId: number;
+  firstName: string | null;
+  lastName: string | null;
+  gender: string | null;
+  /** YYYYMMDD, YYYY, or "0" when unknown. */
+  birthDate: string | null;
+  deathDate: string | null;
+  birthParish: string | null;
+  occupation: string | null;
+  movedInParish: string | null;
+  movedOutParish: string | null;
+  relatedPersonName: string | null;
+  relatedPersonOccupation: string | null;
+  sources: string | null;
+  comment: string | null;
+  biographyFilename: string | null;
+}
+
+export interface Seaman {
+  id: number;
+  firstName: string | null;
+  lastName1: string | null;
+  lastName2: string | null;
+  /** YYYYMMDD, YYYY, or empty when unknown, like the other dates here. */
+  birthDate: string | null;
+  birthParish: string | null;
+  birthPlace: string | null;
+  homeParish: string | null;
+  homePlace: string | null;
+  age: string | null;
+  civilStatus: string | null;
+  father: string | null;
+  mother: string | null;
+  rank: string | null;
+  ship: string | null;
+  shipType: string | null;
+  shipOwner: string | null;
+  captain: string | null;
+  homePort: string | null;
+  destination: string | null;
+  signOnDate: string | null;
+  signOnPlace: string | null;
+  signOffDate: string | null;
+  signOffPlace: string | null;
+  enrollmentDate: string | null;
+  enrollmentNumber: string | null;
+  seamensHouse: string | null;
+  archive: string | null;
+  archiveNumber: string | null;
+  volume: string | null;
+  page: string | null;
+  note: string | null;
+  other: string | null;
+}
+
+/** "18460626" becomes "1846-06-26". A bare year is kept, and "0" means unknown. */
+const archiveDate = (value: string | null | undefined): string | undefined => {
+  const trimmed = opt(value);
+  if (!trimmed || trimmed === '0') return undefined;
+  return /^\d{8}$/.test(trimmed) ? `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6)}` : trimmed;
+};
+
+const joined = (...parts: (string | null | undefined)[]): string | undefined =>
+  parts.map(opt).filter(Boolean).join(', ') || undefined;
+
+const detailRows = (entries: [string, string | undefined][]): DetailRow[] =>
+  entries.filter((entry): entry is [string, string] => !!entry[1]).map(([label, value]) => ({ label, value }));
+
+export const mapPersonToDocument = (person: Person): Document => ({
+  id: `person-${person.personId}`,
+  title: [opt(person.firstName), opt(person.lastName)].filter(Boolean).join(' '),
+  type: 'Person',
+  year: parseYear(archiveDate(person.birthDate) ?? null),
+  location: opt(person.birthParish) ?? '',
+  creator: '',
+  description: '',
+  details: detailRows([
+    ['Förnamn', opt(person.firstName)],
+    ['Efternamn', opt(person.lastName)],
+    ['Kön', opt(person.gender)],
+    ['Födelsedatum', archiveDate(person.birthDate)],
+    ['Födelseförsamling', opt(person.birthParish)],
+    ['Dödsdatum', archiveDate(person.deathDate)],
+    ['Yrke', opt(person.occupation)],
+    ['Inflyttad från', opt(person.movedInParish)],
+    ['Utflyttad till', opt(person.movedOutParish)],
+    ['Relaterad person', joined(person.relatedPersonName, person.relatedPersonOccupation)],
+    ['Källa', opt(person.sources)],
+    ['Kommentar', opt(person.comment)],
+  ]),
+});
+
+export const mapSeamanToDocument = (seaman: Seaman): Document => ({
+  id: `sjoman-${seaman.id}`,
+  title: [opt(seaman.firstName), opt(seaman.lastName1), opt(seaman.lastName2)].filter(Boolean).join(' '),
+  type: 'Seaman',
+  year: parseYear(archiveDate(seaman.birthDate) ?? null),
+  location: opt(seaman.homeParish) ?? opt(seaman.birthParish) ?? '',
+  creator: '',
+  description: '',
+  details: detailRows([
+    ['Förnamn', opt(seaman.firstName)],
+    ['Efternamn', joined(seaman.lastName1, seaman.lastName2)],
+    ['Födelsedatum', archiveDate(seaman.birthDate)],
+    ['Födelseförsamling', opt(seaman.birthParish)],
+    ['Födelseort', opt(seaman.birthPlace)],
+    ['Hemförsamling', opt(seaman.homeParish)],
+    ['Hemort', opt(seaman.homePlace)],
+    ['Ålder', opt(seaman.age)],
+    ['Civilstånd', opt(seaman.civilStatus)],
+    ['Far', opt(seaman.father)],
+    ['Mor', opt(seaman.mother)],
+    ['Befattning', opt(seaman.rank)],
+    ['Fartyg', joined(seaman.ship, seaman.shipType)],
+    ['Befälhavare', opt(seaman.captain)],
+    ['Redare', opt(seaman.shipOwner)],
+    ['Hemmahamn', opt(seaman.homePort)],
+    ['Destination', opt(seaman.destination)],
+    ['Påmönstring', joined(archiveDate(seaman.signOnDate), seaman.signOnPlace)],
+    ['Avmönstring', joined(archiveDate(seaman.signOffDate), seaman.signOffPlace)],
+    ['Inskrivning', joined(archiveDate(seaman.enrollmentDate), seaman.enrollmentNumber)],
+    ['Sjömanshus', opt(seaman.seamensHouse)],
+    ['Arkiv', joined(seaman.archive, seaman.archiveNumber)],
+    ['Volym', joined(seaman.volume, seaman.page ? `sida ${seaman.page}` : undefined)],
+    ['Anteckning', opt(seaman.note)],
+    ['Övrigt', opt(seaman.other)],
+  ]),
+});
+
+export interface LegalEntityRecord {
+  legalEntityId: number;
+  name: string | null;
+  alternativeNames: string | null;
+  category: string | null;
+  location: string | null;
+  locationText: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  principal: string | null;
+  comment: string | null;
+  historyFilename: string | null;
+}
+
+export const mapLegalEntityToDocument = (entity: LegalEntityRecord): Document => ({
+  id: `jurpers-${entity.legalEntityId}`,
+  title: opt(entity.name) ?? '',
+  type: 'LegalEntity',
+  year: parseYear(entity.startDate),
+  location: pickLocation(entity.location, entity.locationText),
+  creator: '',
+  description: '',
+  details: detailRows([
+    ['Namn', opt(entity.name)],
+    ['Andra namn', opt(entity.alternativeNames)],
+    ['Kategori', opt(entity.category)],
+    ['Plats', opt(entity.location) ?? opt(entity.locationText)],
+    ['Startår', opt(entity.startDate)],
+    ['Slutår', opt(entity.endDate)],
+    ['Huvudman', opt(entity.principal)],
+    ['Kommentar', opt(entity.comment)],
+  ]),
+});
+
 export interface CensusRecord {
   id: string;
   firstName: string | null;
@@ -564,18 +750,34 @@ export interface CensusRecord {
   farmNumber: string | null;
   householdNumber: string | null;
   occupationRelation: string | null;
+  orderNumber: string | null;
+  serialNumber: string | null;
 }
 
 export const mapCensusRecordToDocument = (record: CensusRecord): Document => ({
   id: `mantal-${record.id}`,
-  title: [record.firstName, record.lastName].filter(Boolean).join(' '),
+  title: [opt(record.firstName), opt(record.lastName)].filter(Boolean).join(' '),
   type: 'Census',
   year: parseYear(record.birthYear),
   location: '',
   creator: '',
-  description: [record.occupationRelation, record.note].filter(Boolean).join(' — '),
+  description: '',
   accnr: opt(record.objectNumber),
   source: opt(record.source),
+  details: detailRows([
+    ['Förnamn', opt(record.firstName)],
+    ['Efternamn', opt(record.lastName)],
+    ['Kön', opt(record.gender)],
+    ['Födelsedatum', archiveDate(record.birthYear)],
+    ['Yrke/relation', opt(record.occupationRelation)],
+    ['Mantalsår', opt(record.source)],
+    ['Gårdsnummer', opt(record.farmNumber)],
+    ['Hushållsnummer', opt(record.householdNumber)],
+    ['Ordning i hushållet', opt(record.orderNumber)],
+    ['Löpnummer', record.serialNumber === '0' ? undefined : opt(record.serialNumber)],
+    ['Anteckning', opt(record.note)],
+    ['Objektnummer', opt(record.objectNumber)],
+  ]),
 });
 
 /**
