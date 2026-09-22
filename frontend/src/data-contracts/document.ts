@@ -1,4 +1,14 @@
-export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object' | 'Audio' | 'Text';
+/** The six types that carry documents, plus the registers, which are searchable too. */
+export type DocumentType =
+  | 'Film'
+  | 'Publication'
+  | 'Photo'
+  | 'Object'
+  | 'Audio'
+  | 'Text'
+  | 'Person'
+  | 'Census'
+  | 'Seaman';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Film: 'Film',
@@ -7,6 +17,9 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Object: 'Föremål',
   Audio: 'Ljud',
   Text: 'Text',
+  Person: 'Person',
+  Census: 'Mantal',
+  Seaman: 'Sjöman',
 };
 
 export interface DocumentFile {
@@ -64,11 +77,33 @@ export interface Document {
   relatedIds?: string[];
 }
 
+/** A category the creating organisations are grouped into, Verksamhetskategori. */
+export interface Category {
+  id: number;
+  name: string;
+}
+
+export interface CategoryCount extends Category {
+  count: number;
+}
+
 export interface SearchParams {
   query?: string;
-  type?: DocumentType;
+  types?: DocumentType[];
+  yearFrom?: number;
+  yearTo?: number;
+  /** Ids of places in the topography register. Several are alternatives, so they widen. */
+  places?: number[];
+  /** Free-text originator, matching both persons and organisations. */
+  creator?: string;
+  /** One of Man, Kvinna or Okänt. Only the person registers record one. */
+  gender?: string;
+  /** Ids of creating organisations. Several are alternatives, so they widen. */
+  organisations?: number[];
+  /** Ids of organisation categories. Several are alternatives, so they widen. */
+  categories?: number[];
   // Constrained to the fields the combined search can sort on.
-  sortBy?: 'year' | 'title' | 'objectType';
+  sortBy?: 'year' | 'title' | 'objectType' | 'location';
   sortDirection?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
@@ -86,4 +121,8 @@ export interface SearchResult {
   objectTotal: number;
   audioTotal: number;
   textTotal: number;
+  personTotal: number;
+  censusTotal: number;
+  seamanTotal: number;
+  categoryCounts: CategoryCount[];
 }
