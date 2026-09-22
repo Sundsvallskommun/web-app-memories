@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button, Card, Icon } from '@sk-web-gui/react';
-import { ArrowRight, FileText, Image as ImageIcon, Music, Package, User, Video } from 'lucide-react';
+import { ArrowRight, Building2, FileText, Image as ImageIcon, Music, Package, User, Video } from 'lucide-react';
 import { Document } from '@data-contracts/document';
 import { apiURL } from '@utils/api-url';
 
@@ -14,6 +14,7 @@ const PLACEHOLDER_ICONS: Record<string, React.ReactNode> = {
   Text: <FileText size={32} />,
   Publication: <FileText size={32} />,
   Person: <User size={32} />,
+  LegalEntity: <Building2 size={32} />,
 };
 
 const TYPES_WITH_THUMBNAILS = new Set(['Photo', 'Object', 'Publication', 'Text']);

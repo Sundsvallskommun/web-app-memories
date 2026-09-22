@@ -8,7 +8,8 @@ export type DocumentType =
   | 'Text'
   | 'Person'
   | 'Census'
-  | 'Seaman';
+  | 'Seaman'
+  | 'LegalEntity';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Film: 'Film',
@@ -20,6 +21,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Person: 'Person',
   Census: 'Mantal',
   Seaman: 'Sjöman',
+  LegalEntity: 'Juridisk person',
 };
 
 export interface DocumentFile {
@@ -75,6 +77,10 @@ export interface Document {
   // Composite ids of related documents (Photo / FOTO_FOTO). Each links to its
   // own detail page from the "Relaterade foton" strip.
   relatedIds?: string[];
+  // Labelled rows for the registers (Person, Sjöman), shown instead of the document rows.
+  details?: { label: string; value: string }[];
+  // HTML already cleaned by the BFF: a person's biography or a legal entity's history.
+  longText?: string;
 }
 
 /** A category the creating organisations are grouped into, Verksamhetskategori. */
@@ -84,6 +90,12 @@ export interface Category {
 }
 
 export interface CategoryCount extends Category {
+  count: number;
+}
+
+export interface PlaceCount {
+  id: number;
+  name: string;
   count: number;
 }
 
@@ -124,5 +136,7 @@ export interface SearchResult {
   personTotal: number;
   censusTotal: number;
   seamanTotal: number;
+  legalEntityTotal: number;
   categoryCounts: CategoryCount[];
+  placeCounts: PlaceCount[];
 }
