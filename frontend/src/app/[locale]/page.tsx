@@ -266,8 +266,6 @@ const SearchPage: React.FC = () => {
     updateUrl({ q: trimmed || undefined });
   };
 
-  // Both the bar and the chips report a whole next state, so the rules in
-  // filter-state are the only place the filters depend on each other.
   const applyState = (next: FilterState) => {
     setKnownOrganisations((previous) => ({
       ...previous,
@@ -327,7 +325,8 @@ const SearchPage: React.FC = () => {
                   setQueryDraft('');
                   updateUrl({ q: undefined });
                 }}
-                placeholder="Fritext sök"
+                size="md"
+                placeholder="Fritextsök"
                 aria-label="Sökfält"
               />
             </div>
@@ -359,7 +358,6 @@ const SearchPage: React.FC = () => {
               page={page}
               pageSize={pageSize}
               onRetry={() => setRetryToken((t) => t + 1)}
-              onDismissError={() => setFailed(false)}
               onPageChange={handlePageChange}
             />
           </div>

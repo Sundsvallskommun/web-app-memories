@@ -1,4 +1,5 @@
 import { Controller, Get, Param, QueryParam, Res } from 'routing-controllers';
+import { OpenAPI } from 'routing-controllers-openapi';
 import { Response } from 'express';
 import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
@@ -36,14 +37,13 @@ export class LegalEntityController {
 
   /** Search organisations by name, for the Institution filter's picker. */
   @Get('/organisations')
+  @OpenAPI({ summary: 'Search organisations by name for the institution filter' })
   async searchOrganisations(
     @QueryParam('name') name: string,
     @QueryParam('limit') limit: number,
     @Res() response: Response,
   ) {
     const trimmed = name?.trim();
-    // Without a term the only available ordering is alphabetical, which is
-    // useless as a starting list, so say so rather than returning noise.
     if (!trimmed) {
       return response.send({ data: [], total: 0, message: 'success' });
     }
@@ -71,6 +71,7 @@ export class LegalEntityController {
    * link has to look the names back up to label its chips.
    */
   @Get('/organisations/:id')
+  @OpenAPI({ summary: 'Get one organisation by id' })
   async getOrganisationById(@Param('id') id: string, @Res() response: Response) {
     if (!/^\d+$/.test(id)) throw new HttpException(400, `Invalid organisation id: ${id}`);
 

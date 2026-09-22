@@ -1,4 +1,5 @@
 import { Controller, Get, HeaderParam, Param, QueryParam, Res } from 'routing-controllers';
+import { OpenAPI } from 'routing-controllers-openapi';
 import { Response } from 'express';
 import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
@@ -32,8 +33,8 @@ import {
 //
 // This replaces a six-way fan-out that page-walked each collection separately
 // and held the whole corpus in memory to sort and slice it. That approach cost
-// ~36 upstream requests per distinct query against a per-minute quota, and it
-// could only produce accurate totals by fetching everything first.
+// dozens of upstream requests per distinct query against a per-minute quota, and
+// it could only produce accurate totals by fetching everything first.
 
 /** Upstream sort fields. Anything else is dropped rather than substituted. */
 const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType', 'location']);
@@ -69,8 +70,8 @@ const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
 
 /**
  * The registers that carry a gender. Sjöman is deliberately absent: the source
- * has no such column for seamen, so a gender filter silently drops all 116 094
- * of them however it is applied.
+ * has no such column for seamen, so a gender filter silently drops all of them
+ * however it is applied.
  */
 const GENDERED_OBJECT_TYPES = ['Person', 'Mantal'];
 
@@ -95,8 +96,6 @@ const upstreamObjectTypes = (type: string | undefined, gender: string | undefine
   ];
   if (requested.length > 0) return requested;
 
-  // Only Person and Mantal record a gender, so falling back to the document
-  // types would make a gender filter on its own return nothing at all.
   return gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
 };
 
@@ -118,6 +117,7 @@ export class DocumentController {
    * page of results costs exactly one request no matter how many types match.
    */
   @Get('/documents')
+  @OpenAPI({ summary: 'Search objects and registers with filters, sorting and counts per type and category' })
   async searchDocuments(
     @QueryParam('query') query: string,
     @QueryParam('page') page: number = 1,
@@ -153,8 +153,6 @@ export class DocumentController {
 
     appendIds(params, 'topographyId', place);
     if (creator?.trim()) params.set('creator', creator.trim());
-    // Only the person registers record a gender, so this also excludes every
-    // document type and all 116k seamen, who have no such column upstream.
     if (gender?.trim()) params.set('gender', gender.trim());
     appendIds(params, 'creatorLegalEntityId', organisation);
     appendIds(params, 'categoryId', category);
@@ -199,6 +197,7 @@ export class DocumentController {
    * Fetch a single document by composite id (film-N / publ-N / photo-N).
    */
   @Get('/documents/:id')
+  @OpenAPI({ summary: 'Get one object or register record by its composite id' })
   async getDocumentById(@Param('id') id: string, @Res() response: Response) {
     const base = getApiBase('memories');
 
@@ -248,10 +247,11 @@ export class DocumentController {
   /**
    * Pipe a file from the upstream samba share through this proxy without
    * buffering. Important for the Film endpoint where individual records can
-   * be 40+ MB AVI files — buffering them in memory would OOM the proxy in
+   * be large AVI files — buffering them in memory would OOM the proxy in
    * the same way Logbook OOMs the upstream when it wraps the response.
    */
   @Get('/documents/:id/file')
+  @OpenAPI({ summary: 'Get the file of an object in the requested variant' })
   async getDocumentFile(
     @Param('id') id: string,
     @QueryParam('variant') variant: string,
@@ -307,6 +307,7 @@ export class DocumentController {
    * per-media endpoint (`/texts/{id}/media/{mediaId}/file`) added in memories 3.4.
    */
   @Get('/documents/:id/media/:mediaId/file')
+  @OpenAPI({ summary: 'Get one extra media file of a text' })
   async getDocumentMediaFile(
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
@@ -354,6 +355,7 @@ export class DocumentController {
    * on `/file` directly so the browser can render them in-page.)
    */
   @Get('/documents/:id/stream')
+  @OpenAPI({ summary: 'Stream the audio or film of an object' })
   async streamDocument(@Param('id') id: string, @HeaderParam('range') range: string, @Res() response: Response) {
     const base = getApiBase('memories');
     let url: string;

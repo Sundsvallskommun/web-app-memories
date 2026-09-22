@@ -35,7 +35,6 @@ export const parseSize = (raw: string | null): number => {
   return PAGE_SIZE_OPTIONS.includes(n) ? n : DEFAULT_PAGE_SIZE;
 };
 
-// There are records dated 22 and 3000, which are clearly erroneous.
 // The corrupted years are filtered out by the bounds below.
 const MIN_YEAR = 1000;
 const MAX_YEAR = new Date().getFullYear();
@@ -45,7 +44,6 @@ export const parseYear = (raw: string | null): number | undefined => {
   return Number.isInteger(n) && n >= MIN_YEAR && n <= MAX_YEAR ? n : undefined;
 };
 
-/** The chip and modal summary for a period, however few of its ends are set. */
 export const periodLabelFor = (yearFrom?: number, yearTo?: number): string | undefined => {
   if (yearFrom && yearTo) return `${yearFrom} - ${yearTo}`;
   if (yearFrom) return `Från ${yearFrom}`;

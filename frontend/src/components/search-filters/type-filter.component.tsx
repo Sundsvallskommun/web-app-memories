@@ -2,6 +2,7 @@
 
 import { Filter, PopupMenu } from '@sk-web-gui/react';
 import { ChevronDown } from 'lucide-react';
+import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
 import { DOCUMENT_TYPE_LABELS, DocumentType } from '@data-contracts/document';
 import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-alignment';
 
@@ -32,11 +33,17 @@ export const TypeFilterBody: React.FC<Props> = ({ types, selected, countFor, onT
 export const TypeFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu>
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy="type-filter">
+      <PopupMenu.Button
+        size="sm"
+        variant="ghost"
+        rightIcon={<ChevronDown size={18} />}
+        className={OPEN_FILTER_BUTTON_CLASS}
+        data-cy="type-filter"
+      >
         Typ
       </PopupMenu.Button>
 
-      <PopupMenu.Panel className="w-[260px]">
+      <PopupMenu.Panel className="w-[320px]">
         <TypeFilterBody {...props} />
       </PopupMenu.Panel>
     </PopupMenu>

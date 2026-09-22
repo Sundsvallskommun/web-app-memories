@@ -16,11 +16,6 @@ interface SingleResponse {
   data: Organisation;
 }
 
-/**
- * Search organisations by name. Returns nothing for an empty term: there are
- * 6 607 of them, orderable only by name, so a default list opens on obscure
- * businesses rather than anything a user would pick.
- */
 export const searchOrganisations = async (name: string): Promise<Organisation[]> => {
   if (!name.trim()) return [];
 
@@ -28,7 +23,6 @@ export const searchOrganisations = async (name: string): Promise<Organisation[]>
   return response?.data?.data ?? [];
 };
 
-/** One organisation by id, so a shared link can label its filter chips. */
 export const getOrganisation = async (id: number): Promise<Organisation | null> => {
   try {
     const response = await apiService.get<SingleResponse>(`organisations/${id}`);

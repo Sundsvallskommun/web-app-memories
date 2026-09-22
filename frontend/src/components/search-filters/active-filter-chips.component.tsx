@@ -101,9 +101,7 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
           className="h-auto min-h-34 max-w-full py-4 text-left"
         >
           <span className="min-w-0">
-            {NAMED_ON_CHIP.has(chip.filter) && (
-              <span className="block text-[85%] text-dark-placeholder sm:inline">{chip.filter} </span>
-            )}
+            {NAMED_ON_CHIP.has(chip.filter) && <span className="text-dark-secondary">{chip.filter}: </span>}
             <span className="text-dark-primary">{chip.label}</span>
           </span>
         </Chip>

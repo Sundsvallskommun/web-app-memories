@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { Button, FormControl, FormLabel, Input, PopupMenu } from '@sk-web-gui/react';
 import { ChevronDown } from 'lucide-react';
+import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
 
 interface Props {
   label: string;
-  /** Optional: omit when it would only repeat the dropdown label. */
   fieldLabel?: string;
   placeholder: string;
   applyLabel: string;
@@ -64,7 +64,13 @@ export const TextFilterBody: React.FC<BodyProps> = ({
 export const TextFilter: React.FC<Props> = (props) => (
   <div className="relative">
     <PopupMenu type="dialog">
-      <PopupMenu.Button variant="ghost" rightIcon={<ChevronDown size={18} />} data-cy={props['data-cy']}>
+      <PopupMenu.Button
+        size="sm"
+        variant="ghost"
+        rightIcon={<ChevronDown size={18} />}
+        className={OPEN_FILTER_BUTTON_CLASS}
+        data-cy={props['data-cy']}
+      >
         {props.label}
       </PopupMenu.Button>
 
