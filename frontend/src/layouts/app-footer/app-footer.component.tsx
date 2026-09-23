@@ -101,17 +101,26 @@ export const AppFooter: React.FC = () => (
             </div>
           ))}
         </dl>
+        <ul className="m-0 flex list-none flex-col gap-12 p-0">
+          <li className="flex">{linkOrText('Fler kontaktvägar och öppettider', MORE_CONTACTS_HREF)}</li>
+        </ul>
       </section>
 
       <section className="flex flex-col gap-16">
         <h2 className={HEADING_CLASS}>Om innehållet</h2>
-        <p className={BODY_CLASS}>{ABOUT_TEXT}</p>
         <ul className="m-0 flex list-none flex-col gap-12 p-0">
           {ABOUT_LINKS.map((item) => (
             <li key={item.label} className="flex">
               {linkOrText(item.label, item.href)}
             </li>
           ))}
+        </ul>
+      </section>
+
+      <section className="flex flex-col gap-16">
+        <h2 className={HEADING_CLASS}>Följ oss</h2>
+        <ul className="m-0 flex list-none flex-col gap-12 p-0">
+          <li className="flex">{linkOrText('Instagram', INSTAGRAM)}</li>
         </ul>
       </section>
     </div>
