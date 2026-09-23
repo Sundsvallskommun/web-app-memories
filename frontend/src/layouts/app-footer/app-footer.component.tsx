@@ -45,8 +45,6 @@ interface ContactDetail {
 const ABOUT_LINKS: FooterItem[] = [
   { label: 'Om webbplatsen', href: PENDING, icon: ArrowRight },
   { label: 'Tillgänglighetsredogörelse', href: PENDING, icon: ArrowRight },
-  { label: 'Behandling av personuppgifter', href: PENDING, icon: ArrowRight },
-  { label: 'Om kakor (cookies)', href: '/kakor', icon: ArrowRight },
 ];
 
 const DESKTOP_SECTIONS: FooterSection[] = [
