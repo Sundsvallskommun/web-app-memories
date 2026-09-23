@@ -77,6 +77,33 @@ const MOBILE_CONTACT: ContactDetail[] = [
   { label: 'Öppettider', value: OPENING_HOURS },
 ];
 
+const ActionButtons: React.FC = () => (
+  <div className="flex flex-wrap gap-12">
+    <Button.Component
+      as="a"
+      href={PENDING}
+      variant="secondary"
+      rounded
+      inverted
+      leftIcon={<MapIcon size={18} />}
+      className={BUTTON_CLASS}
+    >
+      Resa hit
+    </Button.Component>
+    <Button.Component
+      as="a"
+      href={PENDING}
+      variant="secondary"
+      rounded
+      inverted
+      leftIcon={<MessageCircle size={18} />}
+      className={BUTTON_CLASS}
+    >
+      Kontakta oss
+    </Button.Component>
+  </div>
+);
+
 const linkOrText = (text: string, href?: string) =>
   href ?
     <Link variant="tertiary" inverted href={href} className={TEXT_CLASS}>
@@ -88,6 +115,8 @@ export const AppFooter: React.FC = () => (
   <Footer className="px-20 py-48 bg-inverted-background-200 lg:px-24 lg:pb-80 lg:pt-64" data-cy="app-footer">
     {/* Mobile frame */}
     <div className="flex w-full flex-col gap-48 lg:hidden" data-cy="app-footer-mobile">
+      <ActionButtons />
+
       <section className="flex flex-col gap-16">
         <h2 className={HEADING_CLASS}>Kontakt</h2>
         <dl className="m-0 flex flex-col gap-12">
@@ -124,30 +153,7 @@ export const AppFooter: React.FC = () => (
           className="[&_.sk-logo-figure]:!h-48 [&_.sk-logo-figure]:!w-[28.67px]"
         />
 
-        <div className="flex flex-wrap gap-12">
-          <Button.Component
-            as="a"
-            href={PENDING}
-            variant="secondary"
-            rounded
-            inverted
-            leftIcon={<MapIcon size={18} />}
-            className={BUTTON_CLASS}
-          >
-            Resa hit
-          </Button.Component>
-          <Button.Component
-            as="a"
-            href={PENDING}
-            variant="secondary"
-            rounded
-            inverted
-            leftIcon={<MessageCircle size={18} />}
-            className={BUTTON_CLASS}
-          >
-            Kontakta oss
-          </Button.Component>
-        </div>
+        <ActionButtons />
       </div>
 
       <div className="grid grid-cols-3 gap-24">
