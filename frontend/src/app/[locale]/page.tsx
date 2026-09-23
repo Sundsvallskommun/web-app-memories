@@ -305,6 +305,7 @@ const SearchPage: React.FC = () => {
     if (type === 'Person') return result.personTotal;
     if (type === 'Census') return result.censusTotal;
     if (type === 'Seaman') return result.seamanTotal;
+    if (type === 'LegalEntity') return result.legalEntityTotal;
     return 0;
   };
 
@@ -335,6 +336,7 @@ const SearchPage: React.FC = () => {
               filters={currentFilters}
               countFor={getTypeCount}
               categoryCounts={result?.categoryCounts ?? []}
+              placeCounts={result?.placeCounts}
               onChange={applyState}
             />
           </div>

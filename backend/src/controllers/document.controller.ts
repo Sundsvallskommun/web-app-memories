@@ -5,22 +5,31 @@ import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
 import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
+import { getCollection } from '@services/collection.service';
+import { cleanHtml } from '@/utils/clean-html';
 import {
   Audio,
   CensusRecord,
   CombinedObjectResponse,
   DOCUMENT_OBJECT_TYPES,
+  Document,
   Film,
+  LegalEntityRecord,
+  Person,
   Photo,
   Publication,
+  Seaman,
   Text,
   TypeCount,
   mapAudioToDocument,
   mapCensusRecordToDocument,
   mapCombinedObjectsToDocuments,
   mapFilmToDocument,
+  mapLegalEntityToDocument,
+  mapPersonToDocument,
   mapPhotoToDocument,
   mapPublicationToDocument,
+  mapSeamanToDocument,
   mapTextToDocument,
 } from './document.mapper';
 
@@ -99,6 +108,15 @@ const upstreamObjectTypes = (type: string | undefined, gender: string | undefine
   return gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
 };
 
+/** Adds the full archive chain, which the object view shows as Samling. */
+const withCollection = async (document: Document, nodeId: number | null | undefined): Promise<Document> => {
+  const collection = await getCollection(nodeId);
+  return collection ? { ...document, archiveCollection: collection.chain } : document;
+};
+
+/** A slow biography or history file should never hold up the object view. */
+const LONG_TEXT_TIMEOUT_MS = 5000;
+
 const FALLBACK_FILE_CACHE_CONTROL = 'public, max-age=86400';
 
 const fileCacheControl = (upstream: string | undefined): string =>
@@ -163,10 +181,16 @@ export class DocumentController {
 
     const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/objects?${params.toString()}`;
     const res = await this.apiService.get<CombinedObjectResponse>({ url });
-    const { objects = [], typeCounts, categoryCounts = [], _meta } = res.data;
+    const { objects = [], typeCounts, categoryCounts = [], topographyCounts = [], _meta } = res.data;
+
+    const documents = mapCombinedObjectsToDocuments(objects);
+    const collections = await Promise.all(objects.map(object => getCollection(object.nodeId)));
+    documents.forEach((document, index) => {
+      document.archiveCollection = collections[index]?.archive;
+    });
 
     return response.send({
-      data: mapCombinedObjectsToDocuments(objects),
+      data: documents,
       total: _meta?.totalRecords ?? objects.length,
       totalPages: _meta?.totalPages ?? 1,
       filmTotal: countFor(typeCounts, 'Film'),
@@ -178,11 +202,27 @@ export class DocumentController {
       personTotal: countFor(typeCounts, 'Person'),
       censusTotal: countFor(typeCounts, 'Mantal'),
       seamanTotal: countFor(typeCounts, 'Sjöman'),
+      legalEntityTotal: countFor(typeCounts, 'Juridisk person'),
       categoryCounts: categoryCounts.map(({ categoryId, name, count }) => ({ id: categoryId, name, count })),
+      placeCounts: topographyCounts.map(({ topographyId, name, count }) => ({ id: topographyId, name, count })),
       page: _meta?.page ?? safePage,
       pageSize: _meta?.limit ?? safePageSize,
       message: 'success',
     });
+  }
+
+  /**
+   * A biography or history text. Rare, and not always readable upstream, so any
+   * failure leaves the text out rather than failing the whole object view.
+   */
+  private async fetchLongText(filename: string | null, url: string): Promise<string | undefined> {
+    if (!filename) return undefined;
+    try {
+      const res = await this.apiService.get<string>({ url, responseType: 'text', timeout: LONG_TEXT_TIMEOUT_MS });
+      return cleanHtml(res.data);
+    } catch {
+      return undefined;
+    }
   }
 
   // Validate and extract the numeric suffix from a composite document ID like
@@ -204,25 +244,37 @@ export class DocumentController {
     if (id.startsWith('publ-')) {
       const publId = this.extractNumericId(id, 'publ-');
       const res = await this.apiService.get<Publication>({ url: `${base}/${MUNICIPALITY_ID}/publications/${publId}` });
-      return response.send({ data: mapPublicationToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapPublicationToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('photo-')) {
       const photoId = this.extractNumericId(id, 'photo-');
       const res = await this.apiService.get<Photo>({ url: `${base}/${MUNICIPALITY_ID}/photos/${photoId}` });
-      return response.send({ data: mapPhotoToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapPhotoToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('audio-')) {
       const audioId = this.extractNumericId(id, 'audio-');
       const res = await this.apiService.get<Audio>({ url: `${base}/${MUNICIPALITY_ID}/audios/${audioId}` });
-      return response.send({ data: mapAudioToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapAudioToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('text-')) {
       const textId = this.extractNumericId(id, 'text-');
       const res = await this.apiService.get<Text>({ url: `${base}/${MUNICIPALITY_ID}/texts/${textId}` });
-      return response.send({ data: mapTextToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapTextToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('mantal-')) {
@@ -235,13 +287,44 @@ export class DocumentController {
       return response.send({ data: mapCensusRecordToDocument(res.data), message: 'success' });
     }
 
+    if (id.startsWith('person-')) {
+      const personId = this.extractNumericId(id, 'person-');
+      const res = await this.apiService.get<Person>({ url: `${base}/${MUNICIPALITY_ID}/persons/${personId}` });
+      const longText = await this.fetchLongText(
+        res.data.biographyFilename,
+        `${base}/${MUNICIPALITY_ID}/persons/${personId}/biography`,
+      );
+      return response.send({ data: { ...mapPersonToDocument(res.data), longText }, message: 'success' });
+    }
+
+    if (id.startsWith('jurpers-')) {
+      const legalEntityId = this.extractNumericId(id, 'jurpers-');
+      const res = await this.apiService.get<LegalEntityRecord>({
+        url: `${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}`,
+      });
+      const longText = await this.fetchLongText(
+        res.data.historyFilename,
+        `${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}/history`,
+      );
+      return response.send({ data: { ...mapLegalEntityToDocument(res.data), longText }, message: 'success' });
+    }
+
+    if (id.startsWith('sjoman-')) {
+      const seamanId = this.extractNumericId(id, 'sjoman-');
+      const res = await this.apiService.get<Seaman>({ url: `${base}/${MUNICIPALITY_ID}/seamen/${seamanId}` });
+      return response.send({ data: mapSeamanToDocument(res.data), message: 'success' });
+    }
+
     if (/^[a-z]+-/.test(id) && !id.startsWith('film-')) {
       throw new HttpException(404, 'Not found');
     }
 
     const filmId = this.extractNumericId(id.startsWith('film-') ? id : `film-${id}`, 'film-');
     const res = await this.apiService.get<Film>({ url: `${base}/${MUNICIPALITY_ID}/films/${filmId}` });
-    return response.send({ data: mapFilmToDocument(res.data), message: 'success' });
+    return response.send({
+      data: await withCollection(mapFilmToDocument(res.data), res.data.nodeId),
+      message: 'success',
+    });
   }
 
   /**
