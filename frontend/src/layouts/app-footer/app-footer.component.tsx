@@ -87,7 +87,7 @@ const linkOrText = (text: string, href?: string) =>
   : <span className={TEXT_CLASS}>{text}</span>;
 
 export const AppFooter: React.FC = () => (
-  <Footer className="px-20 py-48 bg-inverted-background-200 lg:px-40 lg:pb-80 lg:pt-64" data-cy="app-footer">
+  <Footer className="px-20 py-48 bg-inverted-background-200 lg:px-24 lg:pb-80 lg:pt-64" data-cy="app-footer">
     {/* Mobile frame */}
     <div className="flex w-full flex-col gap-48 lg:hidden" data-cy="app-footer-mobile">
       <section className="flex flex-col gap-16">
@@ -117,7 +117,7 @@ export const AppFooter: React.FC = () => (
     </div>
 
     {/* Desktop frame */}
-    <div className="mx-auto hidden w-full max-w-[1280px] flex-col gap-48 lg:flex" data-cy="app-footer-desktop">
+    <div className="mx-auto hidden w-full max-w-content flex-col gap-48 lg:flex" data-cy="app-footer-desktop">
       <div className="flex flex-row items-center justify-between gap-24">
         <Logo
           variant="service"
