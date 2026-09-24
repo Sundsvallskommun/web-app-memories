@@ -6,5 +6,9 @@
   "/example": {
     "title": "Exempelsida",
     "description": "Beskrivning utav exempelsidan"
+  },
+  "/about": {
+    "title": "Om webbplatsen",
+    "description": "Om Sundsvallsminnen, källorna bakom portalen och vilka som står bakom den"
   }
 }
