@@ -1,6 +1,6 @@
 describe('Om webbplatsen', () => {
   beforeEach(() => {
-    cy.visit('/about');
+    cy.visit('/om-webbplatsen');
   });
 
   it('shows the text from the old site and links the two documents', () => {
@@ -14,6 +14,6 @@ describe('Om webbplatsen', () => {
 
   it('is where the footer link points', () => {
     cy.visit('/');
-    cy.get('[data-cy="app-footer"]').find('a[href="/about"]').should('exist');
+    cy.get('[data-cy="app-footer"]').find('a[href="/om-webbplatsen"]').should('exist');
   });
 });

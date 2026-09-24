@@ -16,7 +16,7 @@ const EMAIL_HREF = `mailto:${EMAIL}`;
 const PHONE_HREF = 'tel:+4660191875';
 const MORE_CONTACTS_HREF =
   'https://sundsvall.se/kommun/uppleva-och-gora/kultur/kulturmagasinet/medelpadsarkiv/besok-medelpadsarkiv/oppettider';
-const OM_WEBSITE = '/about';
+const OM_WEBSITE = '/om-webbplatsen';
 
 const TEXT_CLASS = 'font-header font-medium py-2 !text-primitives-overlay-lighten-8';
 
