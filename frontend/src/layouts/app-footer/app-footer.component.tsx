@@ -38,12 +38,6 @@ interface FooterSection {
   items: FooterItem[];
 }
 
-interface ContactDetail {
-  label: string;
-  value: string;
-  href?: string;
-}
-
 const ABOUT_TEXT =
   'Sundsvallsminnen är en portal för Sundsvallsområdets lokalhistoria. Här kan du söka information och källmaterial om människor, miljöer, händelser och företeelser i det historiska Sundsvallsområdet.';
 
@@ -52,7 +46,8 @@ const FOLLOW_TEXT =
 
 const ABOUT_LINKS: FooterItem[] = [{ label: 'Om webbplatsen', href: OM_WEBSITE, icon: ArrowRight }];
 
-const DESKTOP_SECTIONS: FooterSection[] = [
+/** Both frames show the same sections. Only the layout and the texts differ. */
+const SECTIONS: FooterSection[] = [
   {
     heading: 'Kontakt',
     items: [
@@ -71,13 +66,6 @@ const DESKTOP_SECTIONS: FooterSection[] = [
   },
 ];
 
-const MOBILE_CONTACT: ContactDetail[] = [
-  { label: 'Telefon', value: PHONE, href: PHONE_HREF },
-  { label: 'E-postadress', value: EMAIL, href: EMAIL_HREF },
-  { label: 'Besöksadress', value: ADDRESS, href: ADDRESS_HREF },
-  { label: 'Öppettider', value: OPENING_HOURS },
-];
-
 const linkOrText = (text: string, href?: string) =>
   href ?
     <Link variant="tertiary" inverted href={href} className={TEXT_CLASS}>
@@ -85,44 +73,38 @@ const linkOrText = (text: string, href?: string) =>
     </Link>
   : <span className={TEXT_CLASS}>{text}</span>;
 
+/** The texts are for the desktop columns, which would otherwise look bare. */
+const Section: React.FC<{ section: FooterSection; withText?: boolean }> = ({ section, withText }) => (
+  <section className="flex flex-col gap-16">
+    <h2 className={HEADING_CLASS}>{section.heading}</h2>
+
+    {withText && section.text && <p className={BODY_CLASS}>{section.text}</p>}
+
+    <ul className="m-0 flex list-none flex-col gap-12 p-0">
+      {section.items.map((item) => {
+        const Icon = item.icon;
+        const text = item.prefix ? `${item.prefix}: ${item.label}` : item.label;
+
+        return (
+          <li key={item.label} className="flex items-center gap-8">
+            <span className="flex shrink-0 p-2 text-primitives-overlay-lighten-8" aria-hidden="true">
+              <Icon size={20} />
+            </span>
+            {linkOrText(text, item.href)}
+          </li>
+        );
+      })}
+    </ul>
+  </section>
+);
+
 export const AppFooter: React.FC = () => (
   <Footer className="px-20 py-48 bg-inverted-background-200 lg:px-24 lg:pb-80 lg:pt-64" data-cy="app-footer">
     {/* Mobile frame */}
     <div className="flex w-full flex-col gap-48 lg:hidden" data-cy="app-footer-mobile">
-      <section className="flex flex-col gap-16">
-        <h2 className={HEADING_CLASS}>Kontakt</h2>
-        <dl className="m-0 flex flex-col gap-12">
-          {MOBILE_CONTACT.map((detail) => (
-            <div key={detail.label} className="flex items-start gap-8">
-              <dt className="shrink-0 py-2 font-header text-[16px] font-bold leading-[24px] text-inverted-dark-primary">
-                {detail.label}
-              </dt>
-              <dd className="m-0">{linkOrText(detail.value, detail.href)}</dd>
-            </div>
-          ))}
-        </dl>
-        <ul className="m-0 flex list-none flex-col gap-12 p-0">
-          <li className="flex">{linkOrText('Fler kontaktvägar och öppettider', MORE_CONTACTS_HREF)}</li>
-        </ul>
-      </section>
-
-      <section className="flex flex-col gap-16">
-        <h2 className={HEADING_CLASS}>Om innehållet</h2>
-        <ul className="m-0 flex list-none flex-col gap-12 p-0">
-          {ABOUT_LINKS.map((item) => (
-            <li key={item.label} className="flex">
-              {linkOrText(item.label, item.href)}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="flex flex-col gap-16">
-        <h2 className={HEADING_CLASS}>Följ oss</h2>
-        <ul className="m-0 flex list-none flex-col gap-12 p-0">
-          <li className="flex">{linkOrText('Instagram', INSTAGRAM)}</li>
-        </ul>
-      </section>
+      {SECTIONS.map((section) => (
+        <Section key={section.heading} section={section} />
+      ))}
     </div>
 
     {/* Desktop frame */}
@@ -136,29 +118,10 @@ export const AppFooter: React.FC = () => (
         />
       </div>
 
+      {/* One gap for every column, so the three read as equal parts. */}
       <div className="grid grid-cols-3 gap-48">
-        {DESKTOP_SECTIONS.map((section) => (
-          <section key={section.heading} className="flex flex-col gap-16">
-            <h2 className={HEADING_CLASS}>{section.heading}</h2>
-
-            {section.text && <p className={BODY_CLASS}>{section.text}</p>}
-
-            <ul className="m-0 flex list-none flex-col gap-12 p-0">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                const text = item.prefix ? `${item.prefix}: ${item.label}` : item.label;
-
-                return (
-                  <li key={item.label} className="flex items-center gap-8">
-                    <span className="flex shrink-0 p-2 text-primitives-overlay-lighten-8" aria-hidden="true">
-                      <Icon size={20} />
-                    </span>
-                    {linkOrText(text, item.href)}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+        {SECTIONS.map((section) => (
+          <Section key={section.heading} section={section} withText />
         ))}
       </div>
     </div>
