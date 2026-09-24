@@ -75,7 +75,7 @@ const DocumentDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
+      <DefaultLayout>
         <Main>
           <div className="bg-background-200 rounded-cards p-24 flex flex-col items-center gap-16">
             <div className="w-full max-w-2xl aspect-[4/3] bg-[#0000001f] animate-shimmer rounded-8" />
@@ -88,7 +88,7 @@ const DocumentDetailPage: React.FC = () => {
 
   if (failed) {
     return (
-      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
+      <DefaultLayout>
         <Main>
           <div className="py-32" role="alert" data-cy="document-error">
             <Alert type="warning">
@@ -109,7 +109,7 @@ const DocumentDetailPage: React.FC = () => {
 
   if (!doc) {
     return (
-      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
+      <DefaultLayout>
         <Main>
           <div className="flex flex-col items-center gap-16 py-32">
             <p>Dokumentet hittades inte.</p>
@@ -126,7 +126,7 @@ const DocumentDetailPage: React.FC = () => {
   const hasTopBlock = FILE_BEARING_TYPES.has(doc.type) || !!doc.description || !!primaryFile || !!downloadError;
 
   return (
-    <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivets databas">
+    <DefaultLayout>
       <Main>
         <div className="flex flex-col gap-24">
           <Breadcrumb>
