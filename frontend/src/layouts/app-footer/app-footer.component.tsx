@@ -11,7 +11,7 @@ const EMAIL = 'sundsvallsminnen@sundsvall.se';
 const PHONE = '060–19 18 75';
 const OPENING_HOURS = 'Tis–tor 12.00–16.00';
 
-const ADDRESS_HREF = 'https://www.google.com/maps/search/?api=1&query=Packhusgatan+4%2C+852+31+Sundsvall';
+const ADDRESS_HREF = 'https://www.google.com/maps/search/?api=1&query=Packhusgatan+4%20+Sundsvall';
 const EMAIL_HREF = `mailto:${EMAIL}`;
 const PHONE_HREF = 'tel:+4660191875';
 const MORE_CONTACTS_HREF =
