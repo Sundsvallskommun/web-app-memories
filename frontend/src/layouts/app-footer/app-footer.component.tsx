@@ -18,9 +18,9 @@ const MORE_CONTACTS_HREF =
   'https://sundsvall.se/kommun/uppleva-och-gora/kultur/kulturmagasinet/medelpadsarkiv/besok-medelpadsarkiv/oppettider';
 const OM_WEBSITE = '/om-webbplatsen';
 
-const TEXT_CLASS = 'font-header font-medium py-2 !text-primitives-overlay-lighten-8';
+const TEXT_CLASS = 'font-header font-medium py-2 !text-inverted-dark-secondary';
 
-const BODY_CLASS = 'm-0 font-header font-medium text-primitives-overlay-lighten-8';
+const BODY_CLASS = 'm-0 font-header font-medium text-inverted-dark-secondary';
 
 const HEADING_CLASS =
   'font-header text-[18px] font-extrabold leading-[28px] text-inverted-dark-primary lg:text-[22px] lg:leading-[32px]';
@@ -87,7 +87,7 @@ const Section: React.FC<{ section: FooterSection; withText?: boolean }> = ({ sec
 
         return (
           <li key={item.label} className="flex items-center gap-8">
-            <span className="flex shrink-0 p-2 text-primitives-overlay-lighten-8" aria-hidden="true">
+            <span className="flex shrink-0 p-2 text-inverted-dark-secondary" aria-hidden="true">
               <Icon size={20} />
             </span>
             {linkOrText(text, item.href)}
