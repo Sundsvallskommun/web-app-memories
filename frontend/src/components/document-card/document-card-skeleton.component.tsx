@@ -1,4 +1,6 @@
-const BLOCK = 'bg-[#0000001f] animate-shimmer';
+export const SKELETON_BLOCK = 'bg-primitives-overlay-darken-3 dark:bg-primitives-overlay-lighten-3 animate-shimmer';
+
+const BLOCK = SKELETON_BLOCK;
 
 export const DocumentCardSkeleton: React.FC = () => (
   <div className="w-full flex flex-col bg-background-200 rounded-8" data-cy="document-card-skeleton">
