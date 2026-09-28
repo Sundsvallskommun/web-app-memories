@@ -9,6 +9,7 @@ import { ArrowLeft, Download } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, Document, DocumentType } from '@data-contracts/document';
 import { getDocumentById } from '@services/document-service';
 import { DocumentPreview } from '@components/document-preview/document-preview.component';
+import { SKELETON_BLOCK } from '@components/document-card/document-card-skeleton.component';
 import { DocumentFiles } from '@components/document-files/document-files.component';
 import { DocumentGallery } from '@components/document-gallery/document-gallery.component';
 import { DocumentRelated } from '@components/document-related/document-related.component';
@@ -78,8 +79,8 @@ const DocumentDetailPage: React.FC = () => {
       <DefaultLayout>
         <Main>
           <div className="bg-background-200 rounded-cards p-24 flex flex-col items-center gap-16">
-            <div className="w-full max-w-2xl aspect-[4/3] bg-[#0000001f] animate-shimmer rounded-8" />
-            <div className="h-16 w-64 bg-[#0000001f] animate-shimmer rounded-8" />
+            <div className={`w-full max-w-2xl aspect-[4/3] rounded-8 ${SKELETON_BLOCK}`} />
+            <div className={`h-16 w-64 rounded-8 ${SKELETON_BLOCK}`} />
           </div>
         </Main>
       </DefaultLayout>
