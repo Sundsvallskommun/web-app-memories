@@ -50,6 +50,8 @@ export interface Audio {
   locationText: string | null;
   location: string | null;
   subject: string | null;
+  /** Only an id when the person has no name recorded. */
+  creator?: Creator | null;
   comment: string | null;
   audioMimeType: string | null;
   nodeId?: number | null;
@@ -78,6 +80,8 @@ export interface Photo {
   rights: string | null;
   accessionNumber: string | null;
   referenceCode: string | null;
+  /** The legacy "Foto Id", from the TIDIGNR column. */
+  earlierReference: string | null;
   // IDs of related photos via FOTO_FOTO. Only populated on detail lookup.
   relatedPhotoIds: number[] | null;
   nodeId?: number | null;
@@ -302,6 +306,13 @@ const creatorName = (creator: Creator | null | undefined): string => creator?.pe
 
 const isObject = (photo: Photo): boolean => (photo.objectType || '').trim().toLowerCase() === 'föremål';
 
+const dateSpan = (from: string | null | undefined, to: string | null | undefined): string | undefined => {
+  const start = opt(from);
+  const end = opt(to);
+  if (start && end && start !== end) return `${start} – ${end}`;
+  return start ?? end;
+};
+
 export const mapFilmToDocument = (film: Film): Document => ({
   id: `film-${film.filmId}`,
   title: film.documentTitle || '',
@@ -313,6 +324,16 @@ export const mapFilmToDocument = (film: Film): Document => ({
   creator: creatorName(film.creator),
   description: film.comment || '',
   files: buildFilmFiles(film),
+  details: detailRows([
+    ['Typ av dokument', opt(film.objectType)],
+    ['Dokumentdatum', opt(film.date)],
+    ['Dokumenttitel', opt(film.documentTitle)],
+    ['Upphovsman', opt(film.creator?.person)],
+    ['Juridisk person', opt(film.creator?.legalEntity)],
+    ['Ort', opt(film.location)],
+    ['Plats', opt(film.locationText)],
+    ['Kommentar', opt(film.comment)],
+  ]),
 });
 
 export const mapFilmsToDocuments = (films: Film[]): Document[] => films.map(mapFilmToDocument);
@@ -337,6 +358,16 @@ export const mapPublicationToDocument = (pub: Publication): Document => {
       ? `${citation.title ?? ''}${citation.number ? ` nr ${citation.number}` : ''}${citation.page ? `, s. ${citation.page}` : ''}`.trim()
       : undefined,
     files: buildPublicationFiles(pub),
+    details: detailRows([
+      ['Typ av dokument', opt(pub.publicationType) ?? 'Publikation'],
+      ['Utgivningsdatum', opt(pub.date)],
+      ['Dokumenttitel', opt(pub.documentTitle)],
+      ['Upphovsman', opt(pub.creator?.person)],
+      ['Juridisk person', opt(pub.creator?.legalEntity)],
+      ['Ort', opt(pub.location)],
+      ['Plats', opt(pub.locationText)],
+      ['Kommentar', opt(pub.comment)],
+    ]),
   };
 };
 
@@ -355,9 +386,21 @@ export const mapPhotoToDocument = (photo: Photo): Document => ({
   location: pickLocation(photo.location, photo.locationText),
   // The legacy site labels referenceCode or accessionNumber as the "Foto Id". Prefer the
   // explicit archive reference (referenceCode) and fall back to accessionNumber.
-  accnr: opt(photo.referenceCode) || opt(photo.accessionNumber),
+  accnr: opt(photo.earlierReference),
   creator: creatorName(photo.creator),
   description: photoDescription(photo),
+  details: detailRows([
+    ['Typ av dokument', opt(photo.objectType)],
+    ['Foto Id', opt(photo.earlierReference)],
+    ['Dokumentdatum', dateSpan(photo.earliest, photo.latest)],
+    ['Dokumenttitel', opt(photo.documentTitle)],
+    ['Upphovsman', opt(photo.creator?.person)],
+    ['Juridisk person', opt(photo.creator?.legalEntity)],
+    ['Ort', opt(photo.location)],
+    ['Plats', opt(photo.locationText)],
+    ['Ämnesord', opt(photo.subjectKeyword)],
+    ['Kommentar', opt(photo.comment)],
+  ]),
   source: photo.rights || undefined,
   files: buildPhotoFiles(photo),
   // FOTO_FOTO links point at other photo records, each addressable via the same
@@ -391,9 +434,21 @@ export const mapAudioToDocument = (audio: Audio): Document => ({
   ort: opt(audio.locationText),
   plats: opt(audio.location),
   location: pickLocation(audio.location, audio.locationText),
-  creator: opt(audio.subject) || '',
+  // The subject keyword is not the originator; only creator carries that, and it is
+  // often absent upstream, which is why the old site shows the row empty too.
+  creator: creatorName(audio.creator),
   description: audio.comment || '',
   files: buildAudioFiles(audio),
+  details: detailRows([
+    ['Typ av dokument', opt(audio.objectType)],
+    ['Dokumentdatum', opt(audio.date)],
+    ['Dokumenttitel', opt(audio.documentTitle)],
+    ['Upphovsman', opt(audio.creator?.person)],
+    ['Juridisk person', opt(audio.creator?.legalEntity)],
+    ['Ort', opt(audio.location)],
+    ['Plats', opt(audio.locationText)],
+    ['Kommentar', opt(audio.comment)],
+  ]),
 });
 
 export const mapAudiosToDocuments = (audios: Audio[]): Document[] => audios.map(mapAudioToDocument);
@@ -451,10 +506,22 @@ export const mapTextToDocument = (text: Text): Document => ({
   ort: opt(text.locationText),
   plats: opt(text.location),
   location: pickLocation(text.location, text.locationText),
-  creator: opt(text.subject) || '',
+  // Texts carry no originator upstream
+  creator: '',
   description: text.comment || '',
   files: buildTextFiles(text),
   media: buildTextMedia(text),
+  details: detailRows([
+    // Every text row upstream carries the same value here, so the old site prints it flat.
+    ['Typ av dokument', 'text'],
+    ['Dokumentdatum', dateSpan(text.documentDate, text.documentEndDate)],
+    ['Dokumenttitel', opt(text.documentTitle)],
+    ['Upphovsman', undefined],
+    ['Juridisk person', undefined],
+    ['Ort', opt(text.location)],
+    ['Plats', opt(text.locationText)],
+    ['Kommentar', opt(text.comment)],
+  ]),
 });
 
 export const mapTextsToDocuments = (texts: Text[]): Document[] => texts.map(mapTextToDocument);
@@ -575,6 +642,8 @@ export const DOCUMENT_OBJECT_TYPES = ['Foto', 'Föremål', 'Film', 'Ljud', 'Text
 
 export interface Person {
   personId: number;
+  /** The legacy "Indiko nr". */
+  personNumber: string | null;
   firstName: string | null;
   lastName: string | null;
   gender: string | null;
@@ -639,8 +708,9 @@ const archiveDate = (value: string | null | undefined): string | undefined => {
 const joined = (...parts: (string | null | undefined)[]): string | undefined =>
   parts.map(opt).filter(Boolean).join(', ') || undefined;
 
+/** Keeps empty values: a blank row means "nothing recorded", not "no such field". */
 const detailRows = (entries: [string, string | undefined][]): DetailRow[] =>
-  entries.filter((entry): entry is [string, string] => !!entry[1]).map(([label, value]) => ({ label, value }));
+  entries.map(([label, value]) => ({ label, value: value ?? '' }));
 
 export const mapPersonToDocument = (person: Person): Document => ({
   id: `person-${person.personId}`,
@@ -650,19 +720,22 @@ export const mapPersonToDocument = (person: Person): Document => ({
   location: opt(person.birthParish) ?? '',
   creator: '',
   description: '',
+  // Labels and order follow the old site
   details: detailRows([
-    ['Förnamn', opt(person.firstName)],
-    ['Efternamn', opt(person.lastName)],
+    ['Indiko nr', opt(person.personNumber)],
     ['Kön', opt(person.gender)],
+    ['Efternamn', opt(person.lastName)],
+    ['Förnamn', opt(person.firstName)],
     ['Födelsedatum', archiveDate(person.birthDate)],
-    ['Födelseförsamling', opt(person.birthParish)],
     ['Dödsdatum', archiveDate(person.deathDate)],
+    ['Födelseförsamling', opt(person.birthParish)],
+    ['Från församling', opt(person.movedInParish)],
+    ['Till församling', opt(person.movedOutParish)],
     ['Yrke', opt(person.occupation)],
-    ['Inflyttad från', opt(person.movedInParish)],
-    ['Utflyttad till', opt(person.movedOutParish)],
+    ['Kommentar', opt(person.comment)],
+    // Not on the old page, but the archive carries them and they are worth showing.
     ['Relaterad person', joined(person.relatedPersonName, person.relatedPersonOccupation)],
     ['Källa', opt(person.sources)],
-    ['Kommentar', opt(person.comment)],
   ]),
 });
 
@@ -676,26 +749,33 @@ export const mapSeamanToDocument = (seaman: Seaman): Document => ({
   description: '',
   details: detailRows([
     ['Förnamn', opt(seaman.firstName)],
-    ['Efternamn', joined(seaman.lastName1, seaman.lastName2)],
-    ['Födelsedatum', archiveDate(seaman.birthDate)],
+    ['Efternamn1', opt(seaman.lastName1)],
+    ['Efternamn2', opt(seaman.lastName2)],
     ['Födelseförsamling', opt(seaman.birthParish)],
-    ['Födelseort', opt(seaman.birthPlace)],
+    ['Födelseplats', opt(seaman.birthPlace)],
     ['Hemförsamling', opt(seaman.homeParish)],
-    ['Hemort', opt(seaman.homePlace)],
+    ['Sjömanshus', opt(seaman.seamensHouse)],
+    ['Idnr', seaman.id ? String(seaman.id) : undefined],
+    ['Födelsedatum', archiveDate(seaman.birthDate)],
     ['Ålder', opt(seaman.age)],
+    ['Befattning', opt(seaman.rank)],
+    ['Påmönstringsort', opt(seaman.signOnPlace)],
+    ['Inskrivningsnr', opt(seaman.enrollmentNumber)],
+    ['Påmönstringsdatum', archiveDate(seaman.signOnDate)],
+    ['Avmönstringsdatum', archiveDate(seaman.signOffDate)],
+    ['Avmönstringsort', opt(seaman.signOffPlace)],
+    ['Fartygstyp', opt(seaman.shipType)],
+    ['Fartyg', opt(seaman.ship)],
+    ['Hemmahamn', opt(seaman.homePort)],
+    ['Destination', opt(seaman.destination)],
+    ['Redare', opt(seaman.shipOwner)],
+    ['Kapten', opt(seaman.captain)],
+    // Not on the old page, but recorded in the archive.
+    ['Hemort', opt(seaman.homePlace)],
     ['Civilstånd', opt(seaman.civilStatus)],
     ['Far', opt(seaman.father)],
     ['Mor', opt(seaman.mother)],
-    ['Befattning', opt(seaman.rank)],
-    ['Fartyg', joined(seaman.ship, seaman.shipType)],
-    ['Befälhavare', opt(seaman.captain)],
-    ['Redare', opt(seaman.shipOwner)],
-    ['Hemmahamn', opt(seaman.homePort)],
-    ['Destination', opt(seaman.destination)],
-    ['Påmönstring', joined(archiveDate(seaman.signOnDate), seaman.signOnPlace)],
-    ['Avmönstring', joined(archiveDate(seaman.signOffDate), seaman.signOffPlace)],
-    ['Inskrivning', joined(archiveDate(seaman.enrollmentDate), seaman.enrollmentNumber)],
-    ['Sjömanshus', opt(seaman.seamensHouse)],
+    ['Inskrivningsdatum', archiveDate(seaman.enrollmentDate)],
     ['Arkiv', joined(seaman.archive, seaman.archiveNumber)],
     ['Volym', joined(seaman.volume, seaman.page ? `sida ${seaman.page}` : undefined)],
     ['Anteckning', opt(seaman.note)],
@@ -725,15 +805,18 @@ export const mapLegalEntityToDocument = (entity: LegalEntityRecord): Document =>
   location: pickLocation(entity.location, entity.locationText),
   creator: '',
   description: '',
+  // Topografiskt namn and Topografisk kod need the topography object from API 3.13.
   details: detailRows([
     ['Namn', opt(entity.name)],
-    ['Andra namn', opt(entity.alternativeNames)],
-    ['Kategori', opt(entity.category)],
-    ['Plats', opt(entity.location) ?? opt(entity.locationText)],
-    ['Startår', opt(entity.startDate)],
-    ['Slutår', opt(entity.endDate)],
+    ['Alternativt namn', opt(entity.alternativeNames)],
     ['Huvudman', opt(entity.principal)],
+    ['Start datum', opt(entity.startDate)],
+    ['Slutdatum', opt(entity.endDate)],
+    ['Plats', opt(entity.location)],
+    ['Obestämbar plats', opt(entity.locationText)],
     ['Kommentar', opt(entity.comment)],
+    // Not on the old page, but useful and already filterable in the search.
+    ['Kategori', opt(entity.category)],
   ]),
 });
 
