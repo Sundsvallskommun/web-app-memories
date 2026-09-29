@@ -15,15 +15,12 @@ import { DocumentGallery } from '@components/document-gallery/document-gallery.c
 import { DocumentRelated } from '@components/document-related/document-related.component';
 import { DownloadError, downloadDocumentFile } from '@utils/download-file';
 
-// Fields the design asks for that the API does not carry: Skapad and Uppdaterat
-// (no upstream column at all). They are left out rather than rendered as
-// permanently empty rows. Add them here when the API grows them.
+/** Rows come ordered and labelled from the BFF. Older records fall back below. */
 const metaRows = (doc: Document): { label: string; value: string }[] => {
-  const typeRow = { label: 'Objekt typ', value: DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type };
-  if (doc.details?.length) return [typeRow, ...doc.details];
+  if (doc.details?.length) return doc.details;
 
   return [
-    typeRow,
+    { label: 'Objekt typ', value: DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type },
     { label: 'Samling', value: doc.archiveCollection ?? '' },
     { label: 'Upphovsman', value: doc.creator },
     { label: 'Plats', value: doc.location },
@@ -124,7 +121,7 @@ const DocumentDetailPage: React.FC = () => {
   }
 
   const title = doc.title || '(Utan titel)';
-  const hasTopBlock = FILE_BEARING_TYPES.has(doc.type) || !!doc.description || !!primaryFile || !!downloadError;
+  const hasTopBlock = FILE_BEARING_TYPES.has(doc.type) || !!primaryFile || !!downloadError;
 
   return (
     <DefaultLayout>
@@ -150,8 +147,6 @@ const DocumentDetailPage: React.FC = () => {
                     katalog.
                   </p>
                 )}
-
-                {doc.description && <p className="text-center font-bold">{doc.description}</p>}
 
                 {primaryFile && (
                   <Button
