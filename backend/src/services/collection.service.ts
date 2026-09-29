@@ -14,11 +14,19 @@ interface NodeDetailResponse {
   path?: UpstreamNode[];
 }
 
+export interface CollectionLevel {
+  /** "Arkiv", "Serie" or "Volym". */
+  nodeType: string;
+  name: string;
+}
+
 export interface Collection {
   /** The archive the object belongs to, for the result cards. */
   archive: string;
   /** Every level from the archive down, for the object view. */
   chain: string;
+  /** The same levels kept apart, as the old site does. */
+  levels: CollectionLevel[];
 }
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -34,7 +42,11 @@ const toCollection = ({ node, path }: NodeDetailResponse): Collection | undefine
   if (levels.length === 0) return undefined;
 
   const archive = levels.find(level => level.nodeType === 'Arkiv') ?? levels[0];
-  return { archive: archive.name, chain: levels.map(level => level.name).join(' > ') };
+  return {
+    archive: archive.name,
+    chain: levels.map(level => level.name).join(' > '),
+    levels: levels.map(level => ({ nodeType: level.nodeType ?? '', name: level.name })),
+  };
 };
 
 /** The archive and series an object sits in. Cached, since a page of hits often shares one. */

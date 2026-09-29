@@ -108,10 +108,17 @@ const upstreamObjectTypes = (type: string | undefined, gender: string | undefine
   return gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
 };
 
-/** Adds the full archive chain, which the object view shows as Samling. */
+/** Arkiv, Serie and Volym as their own rows, one per level the record has. */
 const withCollection = async (document: Document, nodeId: number | null | undefined): Promise<Document> => {
   const collection = await getCollection(nodeId);
-  return collection ? { ...document, archiveCollection: collection.chain } : document;
+  if (!collection) return document;
+
+  const levelRows = collection.levels.map(level => ({ label: level.nodeType, value: level.name }));
+  return {
+    ...document,
+    archiveCollection: collection.chain,
+    details: [...levelRows, ...(document.details ?? [])],
+  };
 };
 
 /** A slow biography or history file should never hold up the object view. */

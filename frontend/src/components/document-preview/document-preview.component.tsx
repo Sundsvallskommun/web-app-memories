@@ -36,11 +36,12 @@ const imageVariants = (doc: Document): Variant[] => {
   return out;
 };
 
-const pdfVariantOf = (doc: Document): Variant | 'text' | undefined => {
+/** A PDF, or the text variant the archive serves as HTML. Both show without a click. */
+const frameVariantOf = (doc: Document): Variant | 'text' | undefined => {
   if (isPdfFilename(findFile(doc, 'large')?.filename)) return 'large';
 
   const carriesText = doc.type === 'Publication' || doc.type === 'Text';
-  if (carriesText && isPdfFilename(findFile(doc, 'text')?.filename)) return 'text';
+  if (carriesText && findFile(doc, 'text')) return 'text';
 
   return undefined;
 };
@@ -63,29 +64,45 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
   if (!isImageType(doc.type)) return null;
 
   const largeIsPdf = isPdfFilename(findFile(doc, 'large')?.filename);
-  const pdfVariant = pdfVariantOf(doc);
+  const frameVariant = frameVariantOf(doc);
   const showImage = !largeIsPdf && imageVariants(doc).length > 0;
 
-  if (!pdfVariant && !showImage) return null;
+  if (!frameVariant && !showImage) return null;
 
   return (
     <div className="w-full flex flex-col gap-md" data-cy="document-preview">
-      {pdfVariant ?
-        <PdfPreview docId={doc.id} title={doc.title} variant={pdfVariant} />
+      {frameVariant ?
+        <FramePreview docId={doc.id} title={doc.title} variant={frameVariant} />
       : <ImagePreview doc={doc} />}
     </div>
   );
 };
 
-const PdfPreview: React.FC<{ docId: string; title: string; variant: string }> = ({ docId, title, variant }) => (
-  <div className="w-full" data-cy="preview-pdf">
-    <iframe
-      src={fileUrl(docId, variant)}
-      title={title || 'PDF-förhandsvisning'}
-      className="w-full h-[80vh] rounded-cards bg-white"
-    />
-  </div>
-);
+/** Fits the document when same-origin, otherwise falls back to the tall default. */
+const FramePreview: React.FC<{ docId: string; title: string; variant: string }> = ({ docId, title, variant }) => {
+  const [height, setHeight] = useState<number>();
+
+  const fitToContent = (event: React.SyntheticEvent<HTMLIFrameElement>) => {
+    try {
+      const body = event.currentTarget.contentDocument?.body;
+      if (body) setHeight(body.scrollHeight + 32);
+    } catch {
+      // Cross-origin, so the document cannot be measured. The default height applies.
+    }
+  };
+
+  return (
+    <div className="w-full" data-cy="preview-pdf">
+      <iframe
+        src={fileUrl(docId, variant)}
+        title={title || 'Förhandsvisning'}
+        onLoad={fitToContent}
+        style={height ? { height } : undefined}
+        className={`w-full rounded-cards bg-white ${height ? '' : 'h-[85vh]'}`}
+      />
+    </div>
+  );
+};
 
 const ImagePreview: React.FC<{ doc: Document }> = ({ doc }) => {
   const variants = useMemo(() => imageVariants(doc), [doc]);
