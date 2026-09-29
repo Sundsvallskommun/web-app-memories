@@ -850,6 +850,7 @@ export const mapLegalEntityToDocument = (entity: LegalEntityRecord): Document =>
   location: pickLocation(entity.location, entity.locationText),
   creator: '',
   description: '',
+  // Topografiskt namn and Topografisk kod need the topography object from API 3.13.
   details: detailRows([
     ['Namn', opt(entity.name)],
     ['Alternativt namn', opt(entity.alternativeNames)],
