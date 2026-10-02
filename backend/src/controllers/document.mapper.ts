@@ -1,5 +1,27 @@
+/**
+ * The place register entry a record points at. `name` is the parish or locality the
+ * old site labels "Ort", `place` the more precise spot it labels "Plats", and
+ * `displayName` the two combined, which is what the result list shows.
+ */
+export interface Topography {
+  topographyId: number;
+  displayName: string | null;
+  name: string | null;
+  code: string | null;
+  place: string | null;
+  municipality: string | null;
+}
+
+/** The holding institution, on photos and objects. */
+export interface Institution {
+  institutionId: number;
+  name: string | null;
+  code: string | null;
+}
+
 export interface Film {
   filmId: number;
+  topography?: Topography | null;
   creator?: Creator | null;
   filename: string | null;
   objectFilePath: string | null;
@@ -22,8 +44,11 @@ export interface Film {
 export interface Publication {
   publicationId: number;
   creator?: Creator | null;
+  topography?: Topography | null;
   filename: string | null;
   publicationType: string | null;
+  /** The old "Dokumentdatum". `date` is the publishing date. */
+  documentDate: string | null;
   date: string | null;
   periodicalTitle: string | null;
   issueNumber: string | null;
@@ -42,6 +67,7 @@ export interface Publication {
 
 export interface Audio {
   audioId: number;
+  topography?: Topography | null;
   filename: string | null;
   objectFilePath: string | null;
   objectType: string | null;
@@ -60,6 +86,8 @@ export interface Audio {
 export interface Photo {
   photoId: number;
   creator?: Creator | null;
+  topography?: Topography | null;
+  institution?: Institution | null;
   filename: string | null;
   documentTitle: string | null;
   subjectKeyword: string | null;
@@ -96,6 +124,7 @@ export interface TextMediaFile {
 
 export interface Text {
   textId: number;
+  topography?: Topography | null;
   filename: string | null;
   documentDate: string | null;
   documentEndDate: string | null;
@@ -330,8 +359,8 @@ export const mapFilmToDocument = (film: Film): Document => ({
     ['Dokumenttitel', opt(film.documentTitle)],
     ['Upphovsman', opt(film.creator?.person)],
     ['Juridisk person', opt(film.creator?.legalEntity)],
-    ['Ort', opt(film.location)],
-    ['Plats', opt(film.locationText)],
+    ['Ort', opt(film.topography?.name)],
+    ['Plats', opt(film.topography?.place)],
     ['Kommentar', opt(film.comment)],
   ]),
 });
@@ -360,12 +389,13 @@ export const mapPublicationToDocument = (pub: Publication): Document => {
     files: buildPublicationFiles(pub),
     details: detailRows([
       ['Typ av dokument', opt(pub.publicationType) ?? 'Publikation'],
+      ['Dokumentdatum', opt(pub.documentDate)],
       ['Utgivningsdatum', opt(pub.date)],
       ['Dokumenttitel', opt(pub.documentTitle)],
       ['Upphovsman', opt(pub.creator?.person)],
       ['Juridisk person', opt(pub.creator?.legalEntity)],
-      ['Ort', opt(pub.location)],
-      ['Plats', opt(pub.locationText)],
+      ['Ort', opt(pub.topography?.name)],
+      ['Plats', opt(pub.topography?.place)],
       ['Kommentar', opt(pub.comment)],
     ]),
   };
@@ -396,8 +426,9 @@ export const mapPhotoToDocument = (photo: Photo): Document => ({
     ['Dokumenttitel', opt(photo.documentTitle)],
     ['Upphovsman', opt(photo.creator?.person)],
     ['Juridisk person', opt(photo.creator?.legalEntity)],
-    ['Ort', opt(photo.location)],
-    ['Plats', opt(photo.locationText)],
+    ['Ort', opt(photo.topography?.name)],
+    ['Plats', opt(photo.topography?.place)],
+    ['Institution', opt(photo.institution?.name)],
     ['Ämnesord', opt(photo.subjectKeyword)],
     ['Kommentar', opt(photo.comment)],
   ]),
@@ -445,8 +476,8 @@ export const mapAudioToDocument = (audio: Audio): Document => ({
     ['Dokumenttitel', opt(audio.documentTitle)],
     ['Upphovsman', opt(audio.creator?.person)],
     ['Juridisk person', opt(audio.creator?.legalEntity)],
-    ['Ort', opt(audio.location)],
-    ['Plats', opt(audio.locationText)],
+    ['Ort', opt(audio.topography?.name)],
+    ['Plats', opt(audio.topography?.place)],
     ['Kommentar', opt(audio.comment)],
   ]),
 });
@@ -518,8 +549,8 @@ export const mapTextToDocument = (text: Text): Document => ({
     ['Dokumenttitel', opt(text.documentTitle)],
     ['Upphovsman', undefined],
     ['Juridisk person', undefined],
-    ['Ort', opt(text.location)],
-    ['Plats', opt(text.locationText)],
+    ['Ort', opt(text.topography?.name)],
+    ['Plats', opt(text.topography?.place)],
     ['Kommentar', opt(text.comment)],
   ]),
 });
@@ -666,6 +697,13 @@ export interface Seaman {
   firstName: string | null;
   lastName1: string | null;
   lastName2: string | null;
+  /** The birth parish as an SCB code, labelled "FSCBkod" on the old page. */
+  birthParishCode: string | null;
+  wage: string | null;
+  wagePeriod: string | null;
+  currency: string | null;
+  signOffReason: string | null;
+  registrationNumber: string | null;
   /** YYYYMMDD, YYYY, or empty when unknown, like the other dates here. */
   birthDate: string | null;
   birthParish: string | null;
@@ -758,13 +796,19 @@ export const mapSeamanToDocument = (seaman: Seaman): Document => ({
     ['Idnr', seaman.id ? String(seaman.id) : undefined],
     ['Födelsedatum', archiveDate(seaman.birthDate)],
     ['Ålder', opt(seaman.age)],
+    ['FSCBkod', opt(seaman.birthParishCode)],
     ['Befattning', opt(seaman.rank)],
     ['Påmönstringsort', opt(seaman.signOnPlace)],
+    ['Hyra', opt(seaman.wage)],
+    ['Valuta', opt(seaman.currency)],
     ['Inskrivningsnr', opt(seaman.enrollmentNumber)],
     ['Påmönstringsdatum', archiveDate(seaman.signOnDate)],
+    ['Bettid', opt(seaman.wagePeriod)],
     ['Avmönstringsdatum', archiveDate(seaman.signOffDate)],
     ['Avmönstringsort', opt(seaman.signOffPlace)],
+    ['Orsak', opt(seaman.signOffReason)],
     ['Fartygstyp', opt(seaman.shipType)],
+    ['Regnr', opt(seaman.registrationNumber)],
     ['Fartyg', opt(seaman.ship)],
     ['Hemmahamn', opt(seaman.homePort)],
     ['Destination', opt(seaman.destination)],
@@ -785,6 +829,7 @@ export const mapSeamanToDocument = (seaman: Seaman): Document => ({
 
 export interface LegalEntityRecord {
   legalEntityId: number;
+  topography?: Topography | null;
   name: string | null;
   alternativeNames: string | null;
   category: string | null;
@@ -812,7 +857,9 @@ export const mapLegalEntityToDocument = (entity: LegalEntityRecord): Document =>
     ['Huvudman', opt(entity.principal)],
     ['Start datum', opt(entity.startDate)],
     ['Slutdatum', opt(entity.endDate)],
-    ['Plats', opt(entity.location)],
+    ['Topografiskt namn', opt(entity.topography?.name)],
+    ['Topografisk kod', opt(entity.topography?.code)],
+    ['Plats', opt(entity.topography?.place)],
     ['Obestämbar plats', opt(entity.locationText)],
     ['Kommentar', opt(entity.comment)],
     // Not on the old page, but useful and already filterable in the search.
