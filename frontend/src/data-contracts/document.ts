@@ -81,6 +81,9 @@ export interface Document {
   details?: { label: string; value: string }[];
   // HTML already cleaned by the BFF: a person's biography or a legal entity's history.
   longText?: string;
+  // Whether the text file holds anything worth showing. Some records carry one that
+  // transforms to an empty document, because their real content is an image.
+  hasTextPreview?: boolean;
 }
 
 /** A category the creating organisations are grouped into, Verksamhetskategori. */
