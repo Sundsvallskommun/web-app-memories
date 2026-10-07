@@ -108,8 +108,8 @@ const FramePreview: React.FC<{ docId: string; title: string; variant: string; fi
         src={fileUrl(docId, variant)}
         title={title || 'Förhandsvisning'}
         onLoad={fitToContent}
-        style={height ? { height } : undefined}
-        className={`w-full rounded-cards bg-white ${height ? '' : 'h-[85vh]'}`}
+        style={{ height: height ?? '85vh' }}
+        className="w-full rounded-cards bg-white"
       />
     </div>
   );
