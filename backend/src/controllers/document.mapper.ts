@@ -201,6 +201,9 @@ export interface Document {
   details?: DetailRow[];
   // Cleaned HTML: a person's biography or a legal entity's history.
   longText?: string;
+  // Whether the record's text file holds anything worth framing. False for records
+  // whose text transforms to an empty document because the content is an image.
+  hasTextPreview?: boolean;
 }
 
 export interface DetailRow {

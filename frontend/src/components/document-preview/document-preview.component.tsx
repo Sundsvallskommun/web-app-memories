@@ -41,7 +41,7 @@ const frameVariantOf = (doc: Document): Variant | 'text' | undefined => {
   if (isPdfFilename(findFile(doc, 'large')?.filename)) return 'large';
 
   const carriesText = doc.type === 'Publication' || doc.type === 'Text';
-  if (carriesText && findFile(doc, 'text')) return 'text';
+  if (carriesText && findFile(doc, 'text') && doc.hasTextPreview) return 'text';
 
   return undefined;
 };
@@ -69,23 +69,34 @@ export const DocumentPreview: React.FC<Props> = ({ doc }) => {
 
   if (!frameVariant && !showImage) return null;
 
+  const framedFileIsPdf = frameVariant ? isPdfFilename(findFile(doc, frameVariant)?.filename) : false;
+
   return (
     <div className="w-full flex flex-col gap-md" data-cy="document-preview">
       {frameVariant ?
-        <FramePreview docId={doc.id} title={doc.title} variant={frameVariant} />
+        <FramePreview docId={doc.id} title={doc.title} variant={frameVariant} fit={!framedFileIsPdf} />
       : <ImagePreview doc={doc} />}
     </div>
   );
 };
 
+const MIN_FITTED_HEIGHT = 400;
+
 /** Fits the document when same-origin, otherwise falls back to the tall default. */
-const FramePreview: React.FC<{ docId: string; title: string; variant: string }> = ({ docId, title, variant }) => {
+const FramePreview: React.FC<{ docId: string; title: string; variant: string; fit: boolean }> = ({
+  docId,
+  title,
+  variant,
+  fit,
+}) => {
   const [height, setHeight] = useState<number>();
 
   const fitToContent = (event: React.SyntheticEvent<HTMLIFrameElement>) => {
+    if (!fit) return;
     try {
       const body = event.currentTarget.contentDocument?.body;
-      if (body) setHeight(body.scrollHeight + 32);
+      const measured = body ? body.scrollHeight + 32 : 0;
+      if (measured >= MIN_FITTED_HEIGHT) setHeight(measured);
     } catch {
       // Cross-origin, so the document cannot be measured. The default height applies.
     }
@@ -97,8 +108,8 @@ const FramePreview: React.FC<{ docId: string; title: string; variant: string }> 
         src={fileUrl(docId, variant)}
         title={title || 'Förhandsvisning'}
         onLoad={fitToContent}
-        style={height ? { height } : undefined}
-        className={`w-full rounded-cards bg-white ${height ? '' : 'h-[85vh]'}`}
+        style={{ height: height ?? '85vh' }}
+        className="w-full rounded-cards bg-white"
       />
     </div>
   );

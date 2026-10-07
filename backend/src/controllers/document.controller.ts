@@ -6,6 +6,7 @@ import { HttpException } from '@/exceptions/HttpException';
 import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
 import { getCollection } from '@services/collection.service';
+import { hasReadableText } from '@services/text-preview.service';
 import { cleanHtml } from '@/utils/clean-html';
 import {
   Audio,
@@ -119,6 +120,18 @@ const withCollection = async (document: Document, nodeId: number | null | undefi
     archiveCollection: collection.chain,
     details: [...levelRows, ...(document.details ?? [])],
   };
+};
+
+/**
+ * Says whether the text file is worth framing. A PDF always is, a transformed XML
+ * only when it carries text, since an empty frame is worse than none.
+ */
+const withTextPreview = async (document: Document, fileUrl: string): Promise<Document> => {
+  const textFile = document.files?.find(file => file.variant === 'text');
+  if (!textFile) return document;
+
+  if (/\.pdf$/i.test(textFile.filename)) return { ...document, hasTextPreview: true };
+  return { ...document, hasTextPreview: await hasReadableText(fileUrl) };
 };
 
 /** A slow biography or history file should never hold up the object view. */
@@ -251,8 +264,9 @@ export class DocumentController {
     if (id.startsWith('publ-')) {
       const publId = this.extractNumericId(id, 'publ-');
       const res = await this.apiService.get<Publication>({ url: `${base}/${MUNICIPALITY_ID}/publications/${publId}` });
+      const document = await withCollection(mapPublicationToDocument(res.data), res.data.nodeId);
       return response.send({
-        data: await withCollection(mapPublicationToDocument(res.data), res.data.nodeId),
+        data: await withTextPreview(document, `${base}/${MUNICIPALITY_ID}/publications/${publId}/file?variant=text`),
         message: 'success',
       });
     }
@@ -278,8 +292,9 @@ export class DocumentController {
     if (id.startsWith('text-')) {
       const textId = this.extractNumericId(id, 'text-');
       const res = await this.apiService.get<Text>({ url: `${base}/${MUNICIPALITY_ID}/texts/${textId}` });
+      const document = await withCollection(mapTextToDocument(res.data), res.data.nodeId);
       return response.send({
-        data: await withCollection(mapTextToDocument(res.data), res.data.nodeId),
+        data: await withTextPreview(document, `${base}/${MUNICIPALITY_ID}/texts/${textId}/file?variant=text`),
         message: 'success',
       });
     }
