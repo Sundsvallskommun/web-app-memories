@@ -1,0 +1,11 @@
+Dockerfile
+.dockerignore
+node_modules
+dist
+data
+npm-debug.log
+.git
+# Never copy local env files (and their secrets) into the image
+.env
+.env.*
+!.env.example.local
