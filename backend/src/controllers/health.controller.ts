@@ -9,4 +9,11 @@ export class HealthController {
   async health(@Res() response: Response) {
     return response.send({ status: 'ok' });
   }
+
+  // The OpenShift startup and readiness probes call /health/up.
+  @Get('/health/up')
+  @OpenAPI({ summary: 'Check that the service is up (OpenShift probes)' })
+  async healthUp(@Res() response: Response) {
+    return response.send({ status: 'ok' });
+  }
 }
