@@ -14,12 +14,11 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# NEXT_PUBLIC_ vars are baked into the browser bundle at build time.
-# The default "/api" is relative, so the browser calls the backend on the same
-# host it loaded the page from. On OpenShift a Route on the frontend host sends /api
-# to the backend, so one image works in stage and production alike.
-ARG NEXT_PUBLIC_API_URL=/api
-ARG NEXT_PUBLIC_APP_NAME=Sundsvallsminnen
+# NEXT_PUBLIC_ vars are baked into the built files. These two are built as placeholders
+# and replaced by entrypoint.sh when the container starts, so each environment can set
+# its own values in the Deployment and one image works in test and production alike.
+ARG NEXT_PUBLIC_API_URL=NEXT_PUBLIC_API_URL_PLACEHOLDER
+ARG NEXT_PUBLIC_APP_NAME=NEXT_PUBLIC_APP_NAME_PLACEHOLDER
 ARG NEXT_PUBLIC_BASE_PATH=
 # next.config.js validates these during the build, so they need values here too.
 # They are read again at runtime by /api/health/up, where they can be overridden.
@@ -48,11 +47,15 @@ COPY --from=builder /app/public ./public
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY entrypoint.sh ./
 
 # OpenShift runs the container as a random user id that belongs to group 0 (root group).
-# Give that group the same rights as the owner so Next.js can write .next/cache
-# (image optimization, ISR). Works the same under plain Docker.
-RUN mkdir -p .next/cache \
+# Give that group the same rights as the owner so entrypoint.sh can rewrite the files in
+# .next and Next.js can write .next/cache. Works the same under plain Docker.
+# The sed strips Windows line endings, in case the image is built from a Windows checkout.
+RUN sed -i 's/\r$//' entrypoint.sh \
+    && chmod 0555 entrypoint.sh \
+    && mkdir -p .next/cache \
     && chgrp -R 0 /app \
     && chmod -R g=u /app
 
@@ -61,4 +64,5 @@ USER 1001
 # OpenShift does not allow ports below 1024. The platform's Service expects 3000.
 EXPOSE 3000
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["node", "server.js"]
