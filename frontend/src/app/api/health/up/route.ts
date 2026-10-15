@@ -6,7 +6,6 @@ const requireAuth = process.env.HEALTH_AUTH === 'true';
 const authUsername = process.env.HEALTH_USERNAME;
 const authPassword = process.env.HEALTH_PASSWORD;
 const userAuth64 = Buffer.from(`${authUsername}:${authPassword}`).toString('base64');
-const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
 
 export const GET = async () => {
   const headersList = await headers();
@@ -17,7 +16,9 @@ export const GET = async () => {
   }
 
   try {
-    const health = await axios.get(`${backendUrl}/health/up`).then((res) => res.data);
+    const health = await axios
+      .get(`${process.env.NEXT_PUBLIC_API_URL}/health/up`)
+      .then((res) => res.data);
 
     return new NextResponse(JSON.stringify(health), { status: 200 });
   } catch (error) {
