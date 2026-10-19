@@ -14,21 +14,13 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# NEXT_PUBLIC_ vars are baked into the built files. These two are built as placeholders
-# and replaced by entrypoint.sh when the container starts, so each environment can set
-# its own values in the Deployment and one image works in test and production alike.
-ARG NEXT_PUBLIC_API_URL=NEXT_PUBLIC_API_URL_PLACEHOLDER
-ARG NEXT_PUBLIC_APP_NAME=NEXT_PUBLIC_APP_NAME_PLACEHOLDER
-ARG NEXT_PUBLIC_BASE_PATH=
-# next.config.js validates these during the build, so they need values here too.
-# They are read again at runtime by /api/health/up, where they can be overridden.
-ARG HEALTH_AUTH=false
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
-    NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME \
-    NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH \
-    HEALTH_AUTH=$HEALTH_AUTH \
-    HEALTH_USERNAME= \
-    HEALTH_PASSWORD= 
+# NEXT_PUBLIC_ vars are baked into the built files. .env-cicd builds them as placeholders,
+# which entrypoint.sh replaces when the container starts, so each environment can set its
+# own values in the Deployment and one image works in test and production alike.
+# Same approach as the other web apps. Do not set these vars with ARG/ENV here as well:
+# env from the Dockerfile wins over .env.local, and .env-cicd would be ignored.
+COPY --chown=1001:0 .env-cicd .env.local
+RUN chmod 0444 .env-cicd .env.local
 
 RUN yarn build
 
