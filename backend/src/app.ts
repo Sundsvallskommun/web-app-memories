@@ -29,12 +29,23 @@ export class App {
   }
 
   public listen() {
-    this.app.listen(this.port, () => {
+    const server = this.app.listen(this.port, () => {
       logger.info(`=================================`);
       logger.info(`ENV: ${this.env}`);
       logger.info(`Listening on port ${this.port}`);
       logger.info(`=================================`);
     });
+
+    // OpenShift sends SIGTERM when it stops a pod (rolling update, scale down). As the
+    // container's main process, Node does not exit on it by itself, so stop taking new
+    // requests, let the running ones finish and exit, before OpenShift's 30 s grace period ends.
+    const shutdown = (signal: NodeJS.Signals) => {
+      logger.info(`${signal} received, closing the server`);
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 20000).unref();
+    };
+    process.once('SIGTERM', shutdown);
+    process.once('SIGINT', shutdown);
   }
 
   private initializeMiddlewares() {

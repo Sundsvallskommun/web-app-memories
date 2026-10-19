@@ -5,3 +5,10 @@ npm-debug.log
 README.md
 .next
 .git
+coverage
+cypress/videos
+cypress/screenshots
+# Never copy local env files (and their secrets) into the image
+.env
+.env.*
+middleware-envs.js
