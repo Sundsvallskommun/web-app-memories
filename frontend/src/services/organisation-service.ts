@@ -16,11 +16,17 @@ interface SingleResponse {
   data: Organisation;
 }
 
-export const searchOrganisations = async (name: string): Promise<Organisation[]> => {
-  if (!name.trim()) return [];
+export interface OrganisationPage {
+  organisations: Organisation[];
+  total: number;
+}
 
-  const response = await apiService.get<ListResponse>('organisations', { params: { name: name.trim() } });
-  return response?.data?.data ?? [];
+/** One page of matches. The BFF caps a page, so `total` says whether there are more. */
+export const searchOrganisations = async (name: string, page = 1): Promise<OrganisationPage> => {
+  if (!name.trim()) return { organisations: [], total: 0 };
+
+  const response = await apiService.get<ListResponse>('organisations', { params: { name: name.trim(), page } });
+  return { organisations: response?.data?.data ?? [], total: response?.data?.total ?? 0 };
 };
 
 export const getOrganisation = async (id: number): Promise<Organisation | null> => {

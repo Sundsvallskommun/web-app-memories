@@ -211,7 +211,7 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCo
     },
     {
       key: 'organisation',
-      label: 'Institution',
+      label: 'Arkivbildare',
       summary: draft.organisations.map((organisation) => organisation.name).join(', ') || NOTHING,
       body: (
         <OrganisationFilterBody
