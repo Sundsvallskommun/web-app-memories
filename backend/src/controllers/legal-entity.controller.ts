@@ -23,7 +23,7 @@ export interface Organisation {
   category?: string;
 }
 
-const MAX_RESULTS = 20;
+const PAGE_SIZE = 20;
 
 const toOrganisation = (entity: UpstreamLegalEntity): Organisation => ({
   id: entity.legalEntityId,
@@ -35,11 +35,12 @@ const toOrganisation = (entity: UpstreamLegalEntity): Organisation => ({
 export class LegalEntityController {
   private readonly apiService = new ApiService();
 
-  /** Search organisations by name, for the Institution filter's picker. */
+  /** Search organisations by name, for the Arkivbildare filter's picker. */
   @Get('/organisations')
-  @OpenAPI({ summary: 'Search organisations by name for the institution filter' })
+  @OpenAPI({ summary: 'Search organisations by name for the archive creator filter' })
   async searchOrganisations(
     @QueryParam('name') name: string,
+    @QueryParam('page') page: number,
     @QueryParam('limit') limit: number,
     @Res() response: Response,
   ) {
@@ -49,8 +50,8 @@ export class LegalEntityController {
     }
 
     const params = new URLSearchParams({
-      page: '1',
-      limit: String(Math.min(Math.max(1, limit || MAX_RESULTS), 100)),
+      page: String(Math.max(1, page || 1)),
+      limit: String(Math.min(Math.max(1, limit || PAGE_SIZE), 100)),
       sortBy: 'name',
       sortDirection: 'ASC',
       name: trimmed,

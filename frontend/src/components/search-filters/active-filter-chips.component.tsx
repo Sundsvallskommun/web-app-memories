@@ -76,7 +76,7 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
 
     ...filters.organisations.map((organisation) => ({
       key: `organisation-${organisation.id}`,
-      filter: 'Institution',
+      filter: 'Arkivbildare',
       label: organisation.name,
       clear: () => onChange(toggleOrganisation(filters, organisation)),
     })),
