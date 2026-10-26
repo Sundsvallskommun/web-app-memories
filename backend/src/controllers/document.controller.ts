@@ -155,7 +155,9 @@ export class DocumentController {
    * page of results costs exactly one request no matter how many types match.
    */
   @Get('/documents')
-  @OpenAPI({ summary: 'Search objects and registers with filters, sorting and counts per type and category' })
+  @OpenAPI({
+    summary: 'Search objects and registers with filters, sorting and counts per type, category and institution',
+  })
   async searchDocuments(
     @QueryParam('query') query: string,
     @QueryParam('page') page: number = 1,
@@ -170,6 +172,7 @@ export class DocumentController {
     @QueryParam('gender') gender: string,
     @QueryParam('organisation') organisation: string,
     @QueryParam('category') category: string,
+    @QueryParam('institution') institution: string,
     @Res() response: Response,
   ) {
     const safePageSize = Math.max(1, pageSize);
@@ -194,6 +197,7 @@ export class DocumentController {
     if (gender?.trim()) params.set('gender', gender.trim());
     appendIds(params, 'creatorLegalEntityId', organisation);
     appendIds(params, 'categoryId', category);
+    appendIds(params, 'institutionId', institution);
 
     for (const objectType of upstreamObjectTypes(type, gender)) {
       params.append('objectType', objectType);
@@ -201,7 +205,14 @@ export class DocumentController {
 
     const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/objects?${params.toString()}`;
     const res = await this.apiService.get<CombinedObjectResponse>({ url });
-    const { objects = [], typeCounts, categoryCounts = [], topographyCounts = [], _meta } = res.data;
+    const {
+      objects = [],
+      typeCounts,
+      categoryCounts = [],
+      topographyCounts = [],
+      institutionCounts = [],
+      _meta,
+    } = res.data;
 
     const documents = mapCombinedObjectsToDocuments(objects);
     const collections = await Promise.all(objects.map(object => getCollection(object.nodeId)));
@@ -225,6 +236,11 @@ export class DocumentController {
       legalEntityTotal: countFor(typeCounts, 'Juridisk person'),
       categoryCounts: categoryCounts.map(({ categoryId, name, count }) => ({ id: categoryId, name, count })),
       placeCounts: topographyCounts.map(({ topographyId, name, count }) => ({ id: topographyId, name, count })),
+      institutionCounts: institutionCounts.map(({ institutionId, name, count }) => ({
+        id: institutionId,
+        name,
+        count,
+      })),
       page: _meta?.page ?? safePage,
       pageSize: _meta?.limit ?? safePageSize,
       message: 'success',
