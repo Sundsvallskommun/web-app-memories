@@ -1,4 +1,4 @@
-import { Category, DocumentType } from '@data-contracts/document';
+import { Category, DocumentType, Institution } from '@data-contracts/document';
 import { Organisation } from '@services/organisation-service';
 import { Place } from '@services/place-service';
 
@@ -7,11 +7,15 @@ export const REGISTERS: DocumentType[] = ['Person', 'Census', 'Seaman', 'LegalEn
 export const GENDERED_REGISTERS: DocumentType[] = ['Person', 'Census'];
 export const ALL_TYPES: DocumentType[] = [...TYPES, ...REGISTERS];
 
-export const TYPES_SUPPORTING: Record<'gender' | 'creator' | 'place' | 'organisation' | 'category', DocumentType[]> = {
+export const TYPES_SUPPORTING: Record<
+  'gender' | 'creator' | 'place' | 'organisation' | 'category' | 'institution',
+  DocumentType[]
+> = {
   gender: GENDERED_REGISTERS,
   creator: TYPES,
   organisation: TYPES,
   category: TYPES,
+  institution: TYPES,
   place: [...TYPES, 'LegalEntity'],
 };
 
@@ -30,9 +34,10 @@ export interface FilterState {
   gender?: string;
   organisations: Organisation[];
   categories: Category[];
+  institutions: Institution[];
 }
 
-export const EMPTY_FILTERS: FilterState = { types: [], places: [], organisations: [], categories: [] };
+export const EMPTY_FILTERS: FilterState = { types: [], places: [], organisations: [], categories: [], institutions: [] };
 
 export const withTypes = (state: FilterState, types: DocumentType[]): FilterState => ({
   ...state,
@@ -42,6 +47,7 @@ export const withTypes = (state: FilterState, types: DocumentType[]): FilterStat
   places: state.places.length > 0 && !supports('place', types) ? [] : state.places,
   organisations: state.organisations.length > 0 && !supports('organisation', types) ? [] : state.organisations,
   categories: state.categories.length > 0 && !supports('category', types) ? [] : state.categories,
+  institutions: state.institutions.length > 0 && !supports('institution', types) ? [] : state.institutions,
 });
 
 export const toggleType = (state: FilterState, type: DocumentType): FilterState =>
@@ -89,6 +95,15 @@ export const toggleCategory = (state: FilterState, category: Category): FilterSt
   return { ...state, categories, types: categories.length > 0 ? kept : state.types };
 };
 
+export const toggleInstitution = (state: FilterState, institution: Institution): FilterState => {
+  const on = state.institutions.some((chosen) => chosen.id === institution.id);
+  const institutions =
+    on ? state.institutions.filter((chosen) => chosen.id !== institution.id) : [...state.institutions, institution];
+
+  const kept = state.types.filter((type) => TYPES_SUPPORTING.institution.includes(type));
+  return { ...state, institutions, types: institutions.length > 0 ? kept : state.types };
+};
+
 export const setPeriod = (state: FilterState, yearFrom?: number, yearTo?: number): FilterState => ({
   ...state,
   yearFrom,
@@ -104,4 +119,5 @@ export const filterParams = (state: FilterState): Record<string, string | undefi
   gender: state.gender,
   org: state.organisations.length > 0 ? state.organisations.map((one) => one.id).join(',') : undefined,
   category: state.categories.length > 0 ? state.categories.map((one) => one.id).join(',') : undefined,
+  institution: state.institutions.length > 0 ? state.institutions.map((one) => one.id).join(',') : undefined,
 });

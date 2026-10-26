@@ -1,5 +1,12 @@
 import axios from 'axios';
-import { CategoryCount, Document, PlaceCount, SearchParams, SearchResult } from '@data-contracts/document';
+import {
+  CategoryCount,
+  Document,
+  InstitutionCount,
+  PlaceCount,
+  SearchParams,
+  SearchResult,
+} from '@data-contracts/document';
 import { apiService } from '@services/api-service';
 
 interface ApiResponse {
@@ -18,6 +25,7 @@ interface ApiResponse {
   legalEntityTotal?: number;
   categoryCounts?: CategoryCount[];
   placeCounts?: PlaceCount[];
+  institutionCounts?: InstitutionCount[];
   page: number;
   pageSize: number;
   message: string;
@@ -40,6 +48,7 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
   if (params.gender) queryParams.gender = params.gender;
   if (params.organisations?.length) queryParams.organisation = params.organisations.join(',');
   if (params.categories?.length) queryParams.category = params.categories.join(',');
+  if (params.institutions?.length) queryParams.institution = params.institutions.join(',');
   if (params.sortBy) queryParams.sortBy = params.sortBy;
   if (params.sortDirection) queryParams.sortDirection = params.sortDirection;
 
@@ -64,6 +73,7 @@ export const searchDocuments = async (params: SearchParams): Promise<SearchResul
     legalEntityTotal: data?.legalEntityTotal || 0,
     categoryCounts: data?.categoryCounts ?? [],
     placeCounts: data?.placeCounts ?? [],
+    institutionCounts: data?.institutionCounts ?? [],
   };
 };
 

@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import DefaultLayout from '@layouts/default-layout/default-layout.component';
 import Main from '@layouts/main/main.component';
 import { SearchField } from '@sk-web-gui/react';
-import { Category, DocumentType, SearchParams, SearchResult } from '@data-contracts/document';
+import { Category, DocumentType, Institution, SearchParams, SearchResult } from '@data-contracts/document';
 import { ActiveFilterChips } from '@components/search-filters/active-filter-chips.component';
 import { ResultsToolbar } from '@components/search-results/results-toolbar.component';
 import { SearchResults } from '@components/search-results/search-results.component';
@@ -18,6 +18,7 @@ import {
   DEFAULT_PAGE_SIZE,
   SortBy,
   SortDirection,
+  parseIds,
   parsePage,
   parseSize,
   parseSortBy,
@@ -41,34 +42,15 @@ const SearchPage: React.FC = () => {
   const pageSize = parseSize(urlParams.get('size'));
   const yearFrom = parseYear(urlParams.get('from'));
   const yearTo = parseYear(urlParams.get('to'));
-  const placeIds = [
-    ...new Set(
-      (urlParams.get('place') ?? '')
-        .split(',')
-        .map((value) => Number(value.trim()))
-        .filter((id) => Number.isInteger(id) && id > 0)
-    ),
-  ];
+  const placeIds = parseIds(urlParams.get('place'));
   const placeIdsKey = placeIds.join(',');
   const creator = urlParams.get('creator')?.trim() || undefined;
-  const organisationIds = [
-    ...new Set(
-      (urlParams.get('org') ?? '')
-        .split(',')
-        .map((value) => Number(value.trim()))
-        .filter((id) => Number.isInteger(id) && id > 0)
-    ),
-  ];
+  const organisationIds = parseIds(urlParams.get('org'));
   const organisationIdsKey = organisationIds.join(',');
-  const categoryIds = [
-    ...new Set(
-      (urlParams.get('category') ?? '')
-        .split(',')
-        .map((value) => Number(value.trim()))
-        .filter((id) => Number.isInteger(id) && id > 0)
-    ),
-  ];
+  const categoryIds = parseIds(urlParams.get('category'));
   const categoryIdsKey = categoryIds.join(',');
+  const institutionIds = parseIds(urlParams.get('institution'));
+  const institutionIdsKey = institutionIds.join(',');
   const genderParam = urlParams.get('gender')?.trim();
   const gender = genderParam && GENDERS.includes(genderParam) ? genderParam : undefined;
 
@@ -133,6 +115,12 @@ const SearchPage: React.FC = () => {
     name: knownCategories[id] ?? String(id),
   }));
 
+  const [knownInstitutions, setKnownInstitutions] = useState<Record<number, string>>({});
+  const selectedInstitutions: Institution[] = institutionIds.map((id) => ({
+    id,
+    name: knownInstitutions[id] ?? String(id),
+  }));
+
   /** Everything the filters hold right now, as one value the rules can work on. */
   const currentFilters: FilterState = {
     types: selectedTypes,
@@ -143,6 +131,7 @@ const SearchPage: React.FC = () => {
     gender,
     organisations: selectedOrganisations,
     categories: selectedCategories,
+    institutions: selectedInstitutions,
   };
 
   const [failed, setFailed] = useState(false);
@@ -170,7 +159,8 @@ const SearchPage: React.FC = () => {
           'creator' in patch ||
           'gender' in patch ||
           'org' in patch ||
-          'category' in patch)
+          'category' in patch ||
+          'institution' in patch)
       ) {
         next.delete('page');
       }
@@ -199,6 +189,7 @@ const SearchPage: React.FC = () => {
         gender,
         organisationIds,
         categoryIds,
+        institutionIds,
         sortBy,
         sortDirection,
         page,
@@ -215,6 +206,7 @@ const SearchPage: React.FC = () => {
       gender,
       organisationIdsKey,
       categoryIdsKey,
+      institutionIdsKey,
       sortBy,
       sortDirection,
       page,
@@ -234,6 +226,7 @@ const SearchPage: React.FC = () => {
       gender,
       organisations: organisationIds,
       categories: categoryIds,
+      institutions: institutionIds,
       sortBy,
       sortDirection,
       page,
@@ -248,6 +241,10 @@ const SearchPage: React.FC = () => {
         setKnownCategories((previous) => ({
           ...previous,
           ...Object.fromEntries(res.categoryCounts.map((category) => [category.id, category.name])),
+        }));
+        setKnownInstitutions((previous) => ({
+          ...previous,
+          ...Object.fromEntries(res.institutionCounts.map((institution) => [institution.id, institution.name])),
         }));
       })
       .catch(() => {
@@ -274,6 +271,10 @@ const SearchPage: React.FC = () => {
     setKnownCategories((previous) => ({
       ...previous,
       ...Object.fromEntries(next.categories.map((one) => [one.id, one.name])),
+    }));
+    setKnownInstitutions((previous) => ({
+      ...previous,
+      ...Object.fromEntries(next.institutions.map((one) => [one.id, one.name])),
     }));
     setKnownPlaces((previous) => ({
       ...previous,
@@ -336,6 +337,7 @@ const SearchPage: React.FC = () => {
               filters={currentFilters}
               countFor={getTypeCount}
               categoryCounts={result?.categoryCounts ?? []}
+              institutionCounts={result?.institutionCounts ?? []}
               placeCounts={result?.placeCounts}
               onChange={applyState}
             />

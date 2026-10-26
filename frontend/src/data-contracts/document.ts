@@ -96,6 +96,16 @@ export interface CategoryCount extends Category {
   count: number;
 }
 
+/** The archive institution holding the material, for example Kommunarkivet. */
+export interface Institution {
+  id: number;
+  name: string;
+}
+
+export interface InstitutionCount extends Institution {
+  count: number;
+}
+
 export interface PlaceCount {
   id: number;
   name: string;
@@ -117,6 +127,8 @@ export interface SearchParams {
   organisations?: number[];
   /** Ids of organisation categories. Several are alternatives, so they widen. */
   categories?: number[];
+  /** Ids of institutions. Several are alternatives, so they widen. The registers hold none. */
+  institutions?: number[];
   // Constrained to the fields the combined search can sort on.
   sortBy?: 'year' | 'title' | 'objectType' | 'location';
   sortDirection?: 'asc' | 'desc';
@@ -142,4 +154,5 @@ export interface SearchResult {
   legalEntityTotal: number;
   categoryCounts: CategoryCount[];
   placeCounts: PlaceCount[];
+  institutionCounts: InstitutionCount[];
 }
