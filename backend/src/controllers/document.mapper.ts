@@ -645,11 +645,19 @@ export interface TopographyCount {
   count: number;
 }
 
+/** Rows held by one institution. Registers hold none, so the counts sum to less than the total. */
+export interface InstitutionCount {
+  institutionId: number;
+  name: string;
+  count: number;
+}
+
 export interface CombinedObjectResponse {
   objects: CombinedObject[];
   typeCounts: TypeCount[];
   categoryCounts?: CategoryCount[];
   topographyCounts?: TopographyCount[];
+  institutionCounts?: InstitutionCount[];
   _meta: PagingMetaData;
 }
 

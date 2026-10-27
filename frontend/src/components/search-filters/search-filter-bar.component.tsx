@@ -3,10 +3,17 @@
 import { useState } from 'react';
 import { Button } from '@sk-web-gui/react';
 import { ListFilter } from 'lucide-react';
-import { CategoryCount, DOCUMENT_TYPE_LABELS, DocumentType, PlaceCount } from '@data-contracts/document';
+import {
+  CategoryCount,
+  DOCUMENT_TYPE_LABELS,
+  DocumentType,
+  InstitutionCount,
+  PlaceCount,
+} from '@data-contracts/document';
 import { FilterModal, FilterRow } from '@components/search-filters/filter-modal.component';
 import { CategoryFilter, CategoryFilterBody } from '@components/search-filters/category-filter.component';
 import { FilterItem, FilterOverflowRow } from '@components/search-filters/filter-overflow-row.component';
+import { InstitutionFilter, InstitutionFilterBody } from '@components/search-filters/institution-filter.component';
 import { OrganisationFilter, OrganisationFilterBody } from '@components/search-filters/organisation-filter.component';
 import { PeriodFilter, PeriodFilterBody } from '@components/search-filters/period-filter.component';
 import { PersonFilter, PersonFilterBody } from '@components/search-filters/person-filter.component';
@@ -22,6 +29,7 @@ import {
   setScoped,
   toggleAllRegisters,
   toggleCategory,
+  toggleInstitution,
   toggleOrganisation,
   togglePlace,
   toggleType,
@@ -35,11 +43,19 @@ interface Props {
   filters: FilterState;
   countFor: (type: DocumentType) => number;
   categoryCounts: CategoryCount[];
+  institutionCounts: InstitutionCount[];
   placeCounts?: PlaceCount[];
   onChange: (next: FilterState) => void;
 }
 
-export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCounts, placeCounts, onChange }) => {
+export const SearchFilterBar: React.FC<Props> = ({
+  filters,
+  countFor,
+  categoryCounts,
+  institutionCounts,
+  placeCounts,
+  onChange,
+}) => {
   const isMobile = useMediaQuery(BELOW_MD);
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState<FilterState>(EMPTY_FILTERS);
@@ -112,6 +128,16 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCo
         <OrganisationFilter
           selected={filters.organisations}
           onToggle={(organisation) => onChange(toggleOrganisation(filters, organisation))}
+        />
+      ),
+    },
+    {
+      key: 'institution',
+      node: (
+        <InstitutionFilter
+          counts={institutionCounts}
+          selected={filters.institutions}
+          onToggle={(institution) => onChange(toggleInstitution(filters, institution))}
         />
       ),
     },
@@ -218,6 +244,18 @@ export const SearchFilterBar: React.FC<Props> = ({ filters, countFor, categoryCo
           selected={draft.organisations}
           onToggle={(organisation) => setDraft(toggleOrganisation(draft, organisation))}
           hideLabel
+        />
+      ),
+    },
+    {
+      key: 'institution',
+      label: 'Institution',
+      summary: draft.institutions.map((institution) => institution.name).join(', ') || NOTHING,
+      body: (
+        <InstitutionFilterBody
+          counts={institutionCounts}
+          selected={draft.institutions}
+          onToggle={(institution) => setDraft(toggleInstitution(draft, institution))}
         />
       ),
     },

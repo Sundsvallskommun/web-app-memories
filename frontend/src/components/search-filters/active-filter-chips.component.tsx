@@ -9,6 +9,7 @@ import {
   setPeriod,
   setScoped,
   toggleCategory,
+  toggleInstitution,
   toggleOrganisation,
   togglePlace,
   toggleType,
@@ -29,7 +30,7 @@ const SCOPED_LABELS: Record<ScopedFilter, string> = {
 
 const scopedFilters = Object.keys(SCOPED_LABELS) as ScopedFilter[];
 
-const NAMED_ON_CHIP = new Set(['Plats', 'Upphovsperson', 'Verksamhetskategori']);
+const NAMED_ON_CHIP = new Set(['Plats', 'Upphovsperson', 'Verksamhetskategori', 'Institution']);
 
 interface Props {
   filters: FilterState;
@@ -86,6 +87,13 @@ export const ActiveFilterChips: React.FC<Props> = ({ filters, onChange }) => {
       filter: 'Verksamhetskategori',
       label: category.name,
       clear: () => onChange(toggleCategory(filters, category)),
+    })),
+
+    ...filters.institutions.map((institution) => ({
+      key: `institution-${institution.id}`,
+      filter: 'Institution',
+      label: institution.name,
+      clear: () => onChange(toggleInstitution(filters, institution)),
     })),
   ];
 

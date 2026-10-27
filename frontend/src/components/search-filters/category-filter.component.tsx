@@ -1,65 +1,17 @@
 'use client';
 
-import { Filter, PopupMenu } from '@sk-web-gui/react';
-import { ChevronDown } from 'lucide-react';
-import { OPEN_FILTER_BUTTON_CLASS } from '@components/search-filters/open-filter-button';
-import { CHECKBOX_ALIGNMENT_CLASS } from '@components/search-filters/checkbox-alignment';
-import { Category, CategoryCount } from '@data-contracts/document';
+import { CountedFilter, CountedFilterBody, CountedFilterProps } from '@components/search-filters/counted-filter.component';
 
-interface Props {
-  counts: CategoryCount[];
-  selected: Category[];
-  onToggle: (category: Category) => void;
-}
-
-export const CategoryFilterBody: React.FC<Props> = ({ counts, selected, onToggle }) => {
-  const withHits = counts.filter((category) => category.count > 0);
-  const options = [
-    ...withHits,
-    ...selected.filter((chosen) => !withHits.some((category) => category.id === chosen.id)),
-  ];
-
-  if (options.length === 0) {
-    return (
-      <p className="text-label-small text-dark-secondary p-16">Inga kategorier har träffar i den här sökningen.</p>
-    );
-  }
-
-  return (
-    <Filter data-cy="category-filter-list" className={CHECKBOX_ALIGNMENT_CLASS}>
-      <Filter.Label className="sr-only">Filtrera på verksamhetskategori</Filter.Label>
-      {options.map((category) => (
-        <Filter.Item
-          key={category.id}
-          checked={selected.some((chosen) => chosen.id === category.id)}
-          labelPosition="left"
-          onChange={() => onToggle({ id: category.id, name: category.name })}
-        >
-          {'count' in category ? `${category.name} (${category.count})` : category.name}
-        </Filter.Item>
-      ))}
-    </Filter>
-  );
+const LIST = {
+  listLabel: 'Filtrera på verksamhetskategori',
+  emptyText: 'Inga kategorier har träffar i den här sökningen.',
+  listDataCy: 'category-filter-list',
 };
 
-export const CategoryFilter: React.FC<Props> = (props) => (
-  <div className="relative">
-    <PopupMenu>
-      <PopupMenu.Button
-        size="sm"
-        variant="ghost"
-        rightIcon={<ChevronDown size={18} />}
-        className={OPEN_FILTER_BUTTON_CLASS}
-        data-cy="category-filter"
-      >
-        Verksamhetskategori
-      </PopupMenu.Button>
+export const CategoryFilterBody: React.FC<CountedFilterProps> = (props) => <CountedFilterBody {...props} {...LIST} />;
 
-      <PopupMenu.Panel className="w-[320px]">
-        <CategoryFilterBody {...props} />
-      </PopupMenu.Panel>
-    </PopupMenu>
-  </div>
+export const CategoryFilter: React.FC<CountedFilterProps> = (props) => (
+  <CountedFilter {...props} {...LIST} buttonLabel="Verksamhetskategori" buttonDataCy="category-filter" />
 );
 
 export default CategoryFilter;

@@ -44,6 +44,16 @@ export const parseYear = (raw: string | null): number | undefined => {
   return Number.isInteger(n) && n >= MIN_YEAR && n <= MAX_YEAR ? n : undefined;
 };
 
+/** A comma-separated list of ids, with duplicates and anything that is not a positive whole number dropped. */
+export const parseIds = (raw: string | null): number[] => [
+  ...new Set(
+    (raw ?? '')
+      .split(',')
+      .map((value) => Number(value.trim()))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  ),
+];
+
 export const periodLabelFor = (yearFrom?: number, yearTo?: number): string | undefined => {
   if (yearFrom && yearTo) return `${yearFrom} - ${yearTo}`;
   if (yearFrom) return `Från ${yearFrom}`;
