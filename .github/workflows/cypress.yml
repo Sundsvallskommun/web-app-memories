@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Cypress run
-        uses: cypress-io/github-action@6c143abc292aa835d827652c2ea025d098311070
+        uses: cypress-io/github-action@c541a95ea92d9239347a2355f2e895cd4b3f8060
         with:
           working-directory: frontend
           install-command: yarn --frozen-lockfile --silent --network-timeout 1000000
