@@ -1,4 +1,15 @@
-export type DocumentType = 'Film' | 'Publication' | 'Photo' | 'Object' | 'Audio' | 'Text';
+/** The six types that carry documents, plus the registers, which are searchable too. */
+export type DocumentType =
+  | 'Film'
+  | 'Publication'
+  | 'Photo'
+  | 'Object'
+  | 'Audio'
+  | 'Text'
+  | 'Person'
+  | 'Census'
+  | 'Seaman'
+  | 'LegalEntity';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Film: 'Film',
@@ -7,6 +18,10 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   Object: 'Föremål',
   Audio: 'Ljud',
   Text: 'Text',
+  Person: 'Person',
+  Census: 'Mantal',
+  Seaman: 'Sjöman',
+  LegalEntity: 'Juridisk person',
 };
 
 export interface DocumentFile {
@@ -50,6 +65,8 @@ export interface Document {
   // Pending upstream support — backend may emit undefined for now.
   archiveCollection?: string;
   institution?: string;
+  // Record creation date ("Skapad" in the design). Not carried by the API yet.
+  created?: string;
   // Structured citation (Publication only).
   publication?: PublicationCitation;
   source?: string;
@@ -60,12 +77,60 @@ export interface Document {
   // Composite ids of related documents (Photo / FOTO_FOTO). Each links to its
   // own detail page from the "Relaterade foton" strip.
   relatedIds?: string[];
+  // Labelled rows for the registers (Person, Sjöman), shown instead of the document rows.
+  details?: { label: string; value: string }[];
+  // HTML already cleaned by the BFF: a person's biography or a legal entity's history.
+  longText?: string;
+  // Whether the text file holds anything worth showing. Some records carry one that
+  // transforms to an empty document, because their real content is an image.
+  hasTextPreview?: boolean;
+}
+
+/** A category the creating organisations are grouped into, Verksamhetskategori. */
+export interface Category {
+  id: number;
+  name: string;
+}
+
+export interface CategoryCount extends Category {
+  count: number;
+}
+
+/** The archive institution holding the material, for example Kommunarkivet. */
+export interface Institution {
+  id: number;
+  name: string;
+}
+
+export interface InstitutionCount extends Institution {
+  count: number;
+}
+
+export interface PlaceCount {
+  id: number;
+  name: string;
+  count: number;
 }
 
 export interface SearchParams {
   query?: string;
-  type?: DocumentType;
-  sortBy?: 'year' | 'title' | 'location';
+  types?: DocumentType[];
+  yearFrom?: number;
+  yearTo?: number;
+  /** Ids of places in the topography register. Several are alternatives, so they widen. */
+  places?: number[];
+  /** Free-text originator, matching both persons and organisations. */
+  creator?: string;
+  /** One of Man, Kvinna or Okänt. Only the person registers record one. */
+  gender?: string;
+  /** Ids of creating organisations. Several are alternatives, so they widen. */
+  organisations?: number[];
+  /** Ids of organisation categories. Several are alternatives, so they widen. */
+  categories?: number[];
+  /** Ids of institutions. Several are alternatives, so they widen. The registers hold none. */
+  institutions?: number[];
+  // Constrained to the fields the combined search can sort on.
+  sortBy?: 'year' | 'title' | 'objectType' | 'location';
   sortDirection?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
@@ -83,4 +148,11 @@ export interface SearchResult {
   objectTotal: number;
   audioTotal: number;
   textTotal: number;
+  personTotal: number;
+  censusTotal: number;
+  seamanTotal: number;
+  legalEntityTotal: number;
+  categoryCounts: CategoryCount[];
+  placeCounts: PlaceCount[];
+  institutionCounts: InstitutionCount[];
 }

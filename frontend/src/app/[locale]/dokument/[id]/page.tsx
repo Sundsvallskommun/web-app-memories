@@ -4,90 +4,101 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DefaultLayout from '@layouts/default-layout/default-layout.component';
 import Main from '@layouts/main/main.component';
-import { Button, Chip, Table } from '@sk-web-gui/react';
-import { ArrowLeft, Download, FileText, Image, Music, Video, Package } from 'lucide-react';
+import { Alert, Breadcrumb, Button } from '@sk-web-gui/react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { DOCUMENT_TYPE_LABELS, Document, DocumentType } from '@data-contracts/document';
 import { getDocumentById } from '@services/document-service';
 import { DocumentPreview } from '@components/document-preview/document-preview.component';
+import { SKELETON_BLOCK } from '@components/document-card/document-card-skeleton.component';
+import { DocumentFiles } from '@components/document-files/document-files.component';
 import { DocumentGallery } from '@components/document-gallery/document-gallery.component';
 import { DocumentRelated } from '@components/document-related/document-related.component';
-import { DocumentMeta } from '@components/document-meta/document-meta.component';
+import { DownloadError, downloadDocumentFile } from '@utils/download-file';
 
-const typeIcons: Record<string, React.ReactNode> = {
-  Text: <FileText size={20} />,
-  Publication: <FileText size={20} />,
-  Photo: <Image size={20} />,
-  Karta: <Image size={20} />,
-  Ritning: <Image size={20} />,
-  Ljud: <Music size={20} />,
-  Audio: <Music size={20} />,
-  Film: <Video size={20} />,
-  Object: <Package size={20} />,
+/** Rows come ordered and labelled from the BFF. Older records fall back below. */
+const metaRows = (doc: Document): { label: string; value: string }[] => {
+  if (doc.details?.length) return doc.details;
+
+  return [
+    { label: 'Objekt typ', value: DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type },
+    { label: 'Samling', value: doc.archiveCollection ?? '' },
+    { label: 'Upphovsman', value: doc.creator },
+    { label: 'Plats', value: doc.location },
+    { label: 'Tidpunkt', value: doc.year ? String(doc.year) : '' },
+  ].filter((row) => !!row.value);
 };
+
+const FILE_BEARING_TYPES = new Set(['Photo', 'Object', 'Film', 'Audio', 'Text', 'Publication']);
+
+const isMissingItsFile = (doc: Document): boolean =>
+  FILE_BEARING_TYPES.has(doc.type) && (doc.files ?? []).length === 0 && (doc.media ?? []).length === 0;
 
 const DocumentDetailPage: React.FC = () => {
   const params = useParams();
   const router = useRouter();
   const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     const id = params.id as string;
-    if (id) {
-      getDocumentById(id).then((result) => {
-        setDoc(result);
-        setLoading(false);
-      });
-    }
-  }, [params.id]);
+    if (!id) return;
 
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<string | null>(null);
+    setLoading(true);
+    setFailed(false);
+    getDocumentById(id)
+      .then(setDoc)
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
+  }, [params.id, retryToken]);
 
-  const handleDownload = async (filename: string, variant?: string) => {
-    const id = params.id as string;
-    const base = process.env.NEXT_PUBLIC_API_URL || '/api';
-    const url = variant
-      ? `${base}/documents/${id}/file?variant=${variant}`
-      : `${base}/documents/${id}/file`;
+  const primaryFile = doc?.files?.find((f) => f.variant === 'large') ?? doc?.files?.[0];
 
-    // Fetch first so we can detect 404 (file missing on samba) and show a friendly
-    // message instead of letting the browser render its raw error page.
+  const handleDownload = async () => {
+    if (!doc || !primaryFile) return;
+
     setDownloadError(null);
-    setDownloading(filename);
+    setDownloading(true);
     try {
-      const res = await fetch(url);
-      if (!res.ok) {
-        if (res.status === 404) {
-          setDownloadError(`Filen "${filename}" saknas i arkivet. Det här är en känd lucka i digitaliseringen — kontakta arkivet om du behöver originalet.`);
-        } else {
-          setDownloadError(`Kunde inte hämta "${filename}" (felkod ${res.status}).`);
-        }
-        return;
-      }
-      // Stream the blob to a temporary object URL the browser will download.
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      await downloadDocumentFile(doc.id, primaryFile.filename, primaryFile.variant);
     } catch (e) {
-      setDownloadError(`Nedladdningen misslyckades: ${e instanceof Error ? e.message : 'okänt fel'}.`);
+      setDownloadError(e instanceof DownloadError ? e.message : 'Nedladdningen misslyckades.');
     } finally {
-      setDownloading(null);
+      setDownloading(false);
     }
   };
 
   if (loading) {
     return (
-      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
+      <DefaultLayout>
         <Main>
-          <div className="flex justify-center py-xl">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+          <div className="bg-background-200 rounded-cards p-24 flex flex-col items-center gap-16">
+            <div className={`w-full max-w-2xl aspect-[4/3] rounded-8 ${SKELETON_BLOCK}`} />
+            <div className={`h-16 w-64 rounded-8 ${SKELETON_BLOCK}`} />
+          </div>
+        </Main>
+      </DefaultLayout>
+    );
+  }
+
+  if (failed) {
+    return (
+      <DefaultLayout>
+        <Main>
+          <div className="py-32" role="alert" data-cy="document-error">
+            <Alert type="warning">
+              <Alert.Icon />
+              <Alert.Content>
+                <Alert.Content.Title>Dokumentet kunde inte hämtas</Alert.Content.Title>
+                <Alert.Content.Description>Det gick inte att nå arkivet just nu.</Alert.Content.Description>
+                <Button variant="link" size="sm" className="mt-xs" onClick={() => setRetryToken((t) => t + 1)}>
+                  Försök igen
+                </Button>
+              </Alert.Content>
+            </Alert>
           </div>
         </Main>
       </DefaultLayout>
@@ -96,10 +107,10 @@ const DocumentDetailPage: React.FC = () => {
 
   if (!doc) {
     return (
-      <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
+      <DefaultLayout>
         <Main>
-          <div className="flex flex-col items-center gap-md py-xl">
-            <p className="text-body">Dokumentet hittades inte.</p>
+          <div className="flex flex-col items-center gap-16 py-32">
+            <p>Dokumentet hittades inte.</p>
             <Button variant="tertiary" leftIcon={<ArrowLeft size={16} />} onClick={() => router.push('/')}>
               Tillbaka till sökningen
             </Button>
@@ -109,88 +120,83 @@ const DocumentDetailPage: React.FC = () => {
     );
   }
 
+  const title = doc.title || '(Utan titel)';
+  const hasTopBlock = FILE_BEARING_TYPES.has(doc.type) || !!primaryFile || !!downloadError;
+
   return (
-    <DefaultLayout headerTitle="Sundsvallsminnen" headerSubtitle="Sök i arkivet">
+    <DefaultLayout>
       <Main>
-        <div className="flex flex-col gap-lg">
-          {/* Back button */}
-          <div>
-            <Button variant="tertiary" leftIcon={<ArrowLeft size={16} />} onClick={() => router.back()}>
-              Tillbaka till sökningen
-            </Button>
-          </div>
+        <div className="flex flex-col gap-24">
+          <Breadcrumb>
+            <Breadcrumb.Item>
+              <Breadcrumb.Link href="/">Sökning</Breadcrumb.Link>
+            </Breadcrumb.Item>
+            <Breadcrumb.Item currentPage>
+              <Breadcrumb.Link>{title}</Breadcrumb.Link>
+            </Breadcrumb.Item>
+          </Breadcrumb>
+          <h1 className="sr-only">{title}</h1>
+          <div className="bg-background-200 rounded-cards px-16 py-24 flex flex-col gap-32 md:px-72 md:py-40">
+            {hasTopBlock && (
+              <div className="flex flex-col items-center gap-16">
+                <DocumentPreview doc={doc} />
 
-          {/* Title + type */}
-          <div className="flex flex-col gap-sm">
-            <div className="flex items-center gap-sm">
-              <span className="text-dark-secondary">{typeIcons[doc.type]}</span>
-              <Chip strong>{DOCUMENT_TYPE_LABELS[doc.type as DocumentType] ?? doc.type}</Chip>
+                {isMissingItsFile(doc) && (
+                  <p className="text-center text-dark-secondary" data-cy="document-no-file">
+                    Det finns ingen digitaliserad fil för det här objektet. Uppgifterna nedan kommer från arkivets
+                    katalog.
+                  </p>
+                )}
+
+                {primaryFile && (
+                  <Button
+                    color="primary"
+                    rightIcon={<Download size={16} />}
+                    onClick={handleDownload}
+                    loading={downloading}
+                    data-cy="document-download"
+                  >
+                    Ladda ned
+                  </Button>
+                )}
+
+                {downloadError && (
+                  <div role="alert" className="w-full max-w-2xl">
+                    <Alert type="warning">
+                      <Alert.Icon />
+                      <Alert.Content>
+                        <Alert.Content.Description>{downloadError}</Alert.Content.Description>
+                      </Alert.Content>
+                    </Alert>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-16">
+              <h2 className="text-h4-md">Detaljer</h2>
+              <dl className="flex flex-col gap-4" data-cy="document-meta">
+                {metaRows(doc).map((row) => (
+                  <div key={row.label} className="flex gap-8">
+                    <dt className="font-bold">{row.label}:</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-            <h1 className="text-h2-sm md:text-h2-md">{doc.title || '(Utan titel)'}</h1>
-          </div>
-
-          {/* Inline preview (image / video) — placed first so the asset is the
-              user's primary anchor on the page. Component handles its own 404
-              fallback so a missing samba file doesn't break layout. */}
-          <DocumentPreview doc={doc} />
-
-          {/* Gallery of extra media files (Text / TEXT_MULTI). Renders nothing
-              for documents without attached media. */}
-          <DocumentGallery doc={doc} />
-
-          {/* Metadata in legacy field order (matches sok.sundsvallsminnen.se). */}
-          <div className="bg-background-200 rounded-cards p-lg">
-            <h2 className="text-label-medium mb-md">Uppgifter</h2>
-            <DocumentMeta doc={doc} />
-          </div>
-
-          {/* Files / Downloads */}
-          {doc.files && doc.files.length > 0 && (
-            <div className="bg-background-200 rounded-cards p-lg">
-              <h2 className="text-label-medium mb-md">Filer</h2>
-              {downloadError && (
+            {doc.longText && (
+              <div className="flex flex-col gap-16" data-cy="document-long-text">
+                <h2 className="text-h4-md">{doc.type === 'LegalEntity' ? 'Historik' : 'Biografi'}</h2>
                 <div
-                  role="alert"
-                  className="mb-md p-sm rounded-cards bg-error-surface text-error-text border border-error"
-                >
-                  {downloadError}
-                </div>
-              )}
-              <Table>
-                <Table.Header>
-                  <Table.HeaderColumn>Filnamn</Table.HeaderColumn>
-                  <Table.HeaderColumn>Format</Table.HeaderColumn>
-                  <Table.HeaderColumn>Storlek</Table.HeaderColumn>
-                  <Table.HeaderColumn></Table.HeaderColumn>
-                </Table.Header>
-                <Table.Body>
-                  {doc.files.map((file, i) => (
-                    <Table.Row key={i}>
-                      <Table.Column>{file.filename}</Table.Column>
-                      <Table.Column>{file.format}</Table.Column>
-                      <Table.Column>{file.size}</Table.Column>
-                      <Table.Column>
-                        <Button
-                          size="sm"
-                          color="vattjom"
-                          leftIcon={<Download size={14} />}
-                          onClick={() => handleDownload(file.filename, file.variant)}
-                          loading={downloading === file.filename}
-                          disabled={downloading !== null}
-                        >
-                          Ladda ner
-                        </Button>
-                      </Table.Column>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table>
-            </div>
-          )}
-
-          {/* Related photos (FOTO_FOTO) — navigates to each linked record.
-              Renders nothing for documents without related ids. */}
-          <DocumentRelated doc={doc} />
+                  className="[&_a]:underline [&_h3]:mb-8 [&_h3]:text-h4-sm [&_h4]:mb-8 [&_h4]:font-bold [&_li]:mb-4 [&_ol]:list-decimal [&_ol]:pl-24 [&_p]:mb-12 [&_ul]:list-disc [&_ul]:mb-12 [&_ul]:pl-24"
+                  dangerouslySetInnerHTML={{ __html: doc.longText }}
+                />
+              </div>
+            )}
+            <DocumentFiles doc={doc} />
+            <DocumentGallery doc={doc} />
+            <DocumentRelated doc={doc} />
+          </div>
         </div>
       </Main>
     </DefaultLayout>

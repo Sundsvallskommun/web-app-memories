@@ -1,131 +1,146 @@
 import { Controller, Get, HeaderParam, Param, QueryParam, Res } from 'routing-controllers';
+import { OpenAPI } from 'routing-controllers-openapi';
 import { Response } from 'express';
 import { ApiService } from '@services/api.service';
 import { HttpException } from '@/exceptions/HttpException';
 import { MUNICIPALITY_ID } from '@/config';
 import { getApiBase } from '@/config/api-config';
-import { logger } from '@utils/logger';
+import { getCollection } from '@services/collection.service';
+import { hasReadableText } from '@services/text-preview.service';
+import { cleanHtml } from '@/utils/clean-html';
 import {
   Audio,
+  CensusRecord,
+  CombinedObjectResponse,
+  DOCUMENT_OBJECT_TYPES,
   Document,
   Film,
+  LegalEntityRecord,
+  Person,
   Photo,
   Publication,
+  Seaman,
   Text,
+  TypeCount,
   mapAudioToDocument,
-  mapAudiosToDocuments,
+  mapCensusRecordToDocument,
+  mapCombinedObjectsToDocuments,
   mapFilmToDocument,
-  mapFilmsToDocuments,
+  mapLegalEntityToDocument,
+  mapPersonToDocument,
   mapPhotoToDocument,
-  mapPhotosToDocuments,
   mapPublicationToDocument,
-  mapPublicationsToDocuments,
+  mapSeamanToDocument,
   mapTextToDocument,
-  mapTextsToDocuments,
 } from './document.mapper';
 
 // ============================================================================
-//  Server-side document cache
+//  Unified search
 // ============================================================================
 //
-// The previous "fan out per page" approach can't deliver consistent pagination
-// because each upstream source paginates independently — global page N pulls
-// from each source's page N, which doesn't correspond to a single global slice.
-// At high page numbers most sources are exhausted and the page renders sparse
-// or empty (the "ghost pages" issue).
+// Search is one upstream call to /objects, which spans every object type and
+// register, sorts and paginates globally, and returns per-type match counts.
 //
-// Instead: fetch ALL records from each source ONCE, map them to Documents,
-// cache by (source, query). All paging then slices from the cached list:
-//   - per-page count is exactly `pageSize` (or less only on the very last page)
-//   - `totalPages` is accurate
-//   - filtering by type just slices a different cache key
-//   - sort happens in memory, so cross-source sort is truly global
-//
-// Memory budget: ~28k records × ~1KB ≈ 30MB per query for the full unfiltered
-// set. Cap at MAX_CACHE_KEYS entries with LRU eviction so worst-case memory
-// stays bounded regardless of distinct queries.
+// This replaces a six-way fan-out that page-walked each collection separately
+// and held the whole corpus in memory to sort and slice it. That approach cost
+// dozens of upstream requests per distinct query against a per-minute quota, and
+// it could only produce accurate totals by fetching everything first.
 
-type SourceKey = 'film' | 'publication' | 'photo' | 'object' | 'audio' | 'text';
+/** Upstream sort fields. Anything else is dropped rather than substituted. */
+const SORTABLE = new Set(['relevance', 'objectKey', 'title', 'year', 'objectType', 'location']);
 
-interface SourceCacheEntry {
-  documents: Document[];
-  fetchedAt: number;
-}
+const toUpstreamSort = (sortBy: string | undefined): string | undefined =>
+  sortBy && SORTABLE.has(sortBy) ? sortBy : undefined;
 
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes — archive doesn't change often
-const MAX_CACHE_KEYS = 16; // ~4 sources × 4 distinct queries
-const sourceCache = new Map<string, SourceCacheEntry>();
-
-// In-flight request dedupe: if two requests arrive while a source is being
-// warmed, both should `await` the same Promise rather than triggering two
-// concurrent upstream-page-walks. Without this, the first user request and
-// startup warming can race and double the cache-warm cost.
-const inflight = new Map<string, Promise<Document[]>>();
-
-const cacheKey = (source: SourceKey, query?: string): string => `${source}|${query || ''}`;
-
-// ============================================================================
-//  Sort
-// ============================================================================
-//
-// `sortBy` is the frontend-facing column name; we sort the merged Document[]
-// in memory rather than relying on each upstream source's per-source order.
-// (Upstream native SQL queries can sort by raw DB column — but those names
-// vary per source, and combining differently-sorted per-source lists is what
-// caused the previous "clumped by type" UX bug.)
-
-const sortDocuments = (docs: Document[], sortBy: string, sortDirection: string): void => {
-  const direction = sortDirection.toLowerCase() === 'asc' ? 1 : -1;
-  const cmp = (a: Document, b: Document): number => {
-    if (sortBy === 'year') return (a.year || 0) - (b.year || 0);
-    if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '', 'sv');
-    if (sortBy === 'location') return (a.location || '').localeCompare(b.location || '', 'sv');
-    return 0;
-  };
-  docs.sort((a, b) => direction * cmp(a, b));
+/**
+ * Relevance is scored with the best match lowest, so ascending is best first.
+ * Sending DESC alongside it returns the worst matches first.
+ */
+const toUpstreamDirection = (sortBy: string, sortDirection: string | undefined): string => {
+  if (sortBy === 'relevance') return 'ASC';
+  return sortDirection?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 };
 
-// ============================================================================
-//  Upstream pagination helpers
-// ============================================================================
-
-interface UpstreamMeta {
-  page: number;
-  limit: number;
-  count: number;
-  totalRecords: number;
-  totalPages: number;
-}
-
-const UPSTREAM_PAGE_LIMIT = 500; // chunk size when warming the cache
-const FETCH_CONCURRENCY = 8;
-
-const buildUpstreamQuery = (
-  query: string | undefined,
-  page: number,
-  limit: number,
-  extra?: Record<string, string>,
-): string => {
-  const params = new URLSearchParams();
-  if (query) params.set('query', query);
-  params.set('page', String(page));
-  params.set('limit', String(limit));
-  if (extra) for (const [k, v] of Object.entries(extra)) params.set(k, v);
-  return `?${params.toString()}`;
+/**
+ * The frontend's type names, mapped back to the upstream objectType values that
+ * /objects filters on. Foto and Föremål share one upstream collection.
+ */
+const DOCUMENT_TYPE_TO_OBJECT_TYPE: Record<string, string> = {
+  Photo: 'Foto',
+  Object: 'Föremål',
+  Film: 'Film',
+  Audio: 'Ljud',
+  Text: 'Text',
+  Publication: 'Publikation',
+  Person: 'Person',
+  Seaman: 'Sjöman',
+  LegalEntity: 'Juridisk person',
+  Census: 'Mantal',
 };
 
-const evictOldestIfNeeded = (): void => {
-  if (sourceCache.size <= MAX_CACHE_KEYS) return;
-  let oldestKey: string | undefined;
-  let oldestTs = Infinity;
-  for (const [k, v] of sourceCache.entries()) {
-    if (v.fetchedAt < oldestTs) {
-      oldestTs = v.fetchedAt;
-      oldestKey = k;
-    }
+/**
+ * The registers that carry a gender. Sjöman is deliberately absent: the source
+ * has no such column for seamen, so a gender filter silently drops all of them
+ * however it is applied.
+ */
+const GENDERED_OBJECT_TYPES = ['Person', 'Mantal'];
+
+const countFor = (typeCounts: TypeCount[] | undefined, objectType: string): number =>
+  typeCounts?.find(c => c.objectType === objectType)?.count ?? 0;
+
+/** Appends each numeric id in a comma-separated list, so several values widen the search. */
+const appendIds = (params: URLSearchParams, key: string, ids: string | undefined): void => {
+  for (const id of (ids ?? '').split(',').map(value => value.trim())) {
+    if (/^\d+$/.test(id)) params.append(key, id);
   }
-  if (oldestKey) sourceCache.delete(oldestKey);
 };
+
+const upstreamObjectTypes = (type: string | undefined, gender: string | undefined): string[] => {
+  const requested = [
+    ...new Set(
+      (type ?? '')
+        .split(',')
+        .map(name => DOCUMENT_TYPE_TO_OBJECT_TYPE[name.trim()])
+        .filter(Boolean),
+    ),
+  ];
+  if (requested.length > 0) return requested;
+
+  return gender?.trim() ? GENDERED_OBJECT_TYPES : DOCUMENT_OBJECT_TYPES;
+};
+
+/** Arkiv, Serie and Volym as their own rows, one per level the record has. */
+const withCollection = async (document: Document, nodeId: number | null | undefined): Promise<Document> => {
+  const collection = await getCollection(nodeId);
+  if (!collection) return document;
+
+  const levelRows = collection.levels.map(level => ({ label: level.nodeType, value: level.name }));
+  return {
+    ...document,
+    archiveCollection: collection.chain,
+    details: [...levelRows, ...(document.details ?? [])],
+  };
+};
+
+/**
+ * Says whether the text file is worth framing. A PDF always is, a transformed XML
+ * only when it carries text, since an empty frame is worse than none.
+ */
+const withTextPreview = async (document: Document, fileUrl: string): Promise<Document> => {
+  const textFile = document.files?.find(file => file.variant === 'text');
+  if (!textFile) return document;
+
+  if (/\.pdf$/i.test(textFile.filename)) return { ...document, hasTextPreview: true };
+  return { ...document, hasTextPreview: await hasReadableText(fileUrl) };
+};
+
+/** A slow biography or history file should never hold up the object view. */
+const LONG_TEXT_TIMEOUT_MS = 5000;
+
+const FALLBACK_FILE_CACHE_CONTROL = 'public, max-age=86400';
+
+const fileCacheControl = (upstream: string | undefined): string =>
+  upstream && !/no-store|no-cache/i.test(upstream) ? upstream : FALLBACK_FILE_CACHE_CONTROL;
 
 // ============================================================================
 
@@ -134,155 +149,15 @@ export class DocumentController {
   private readonly apiService = new ApiService();
 
   /**
-   * Fetch every page of an upstream collection, in parallel batches, and
-   * concatenate. Returns the raw upstream items (not yet mapped to Document).
-   */
-  private async fetchAllPages<T>(buildUrl: (page: number) => string, itemsKey: string): Promise<T[]> {
-    // First page tells us the total count.
-    const first = await this.apiService.get<Record<string, unknown> & { _meta?: UpstreamMeta }>({ url: buildUrl(1) });
-    const items: T[] = [...((first.data[itemsKey] as T[] | undefined) ?? [])];
-    const totalPages = first.data._meta?.totalPages ?? 1;
-    if (totalPages <= 1) return items;
-
-    // Fetch the rest concurrently to keep cache-warm time tolerable.
-    const remaining = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-    for (let i = 0; i < remaining.length; i += FETCH_CONCURRENCY) {
-      const batch = remaining.slice(i, i + FETCH_CONCURRENCY);
-      const results = await Promise.all(
-        batch.map(page => this.apiService.get<Record<string, unknown>>({ url: buildUrl(page) })),
-      );
-      for (const r of results) {
-        const list = r.data[itemsKey] as T[] | undefined;
-        if (list && list.length > 0) items.push(...list);
-      }
-    }
-    return items;
-  }
-
-  /**
-   * Returns the (possibly cached) full list of Documents for one source,
-   * filtered by `query`. Populates the module-level cache on miss.
+   * Unified search across every document type.
    *
-   * Concurrent calls for the same key share a single in-flight Promise so we
-   * never trigger two parallel cache warms.
-   */
-  private async fetchSource(source: SourceKey, query: string | undefined): Promise<Document[]> {
-    const key = cacheKey(source, query);
-    const cached = sourceCache.get(key);
-    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.documents;
-
-    const pending = inflight.get(key);
-    if (pending) return pending;
-
-    const promise = this.fetchSourceUncached(source, query)
-      .then(docs => {
-        sourceCache.set(key, { documents: docs, fetchedAt: Date.now() });
-        evictOldestIfNeeded();
-        logger.info(`Cached source=${source} query="${query || ''}" → ${docs.length} docs`);
-        return docs;
-      })
-      .finally(() => {
-        inflight.delete(key);
-      });
-    inflight.set(key, promise);
-    return promise;
-  }
-
-  private async fetchSourceUncached(source: SourceKey, query: string | undefined): Promise<Document[]> {
-    const base = getApiBase('memories');
-    let docs: Document[] = [];
-    try {
-      switch (source) {
-        case 'film': {
-          const items = await this.fetchAllPages<Film>(
-            page => `${base}/${MUNICIPALITY_ID}/films${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
-            'films',
-          );
-          docs = mapFilmsToDocuments(items);
-          break;
-        }
-        case 'publication': {
-          const items = await this.fetchAllPages<Publication>(
-            page => `${base}/${MUNICIPALITY_ID}/publications${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
-            'publications',
-          );
-          docs = mapPublicationsToDocuments(items);
-          break;
-        }
-        case 'photo': {
-          const items = await this.fetchAllPages<Photo>(
-            page =>
-              `${base}/${MUNICIPALITY_ID}/photos${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT, { objectType: 'Foto' })}`,
-            'photos',
-          );
-          docs = mapPhotosToDocuments(items);
-          break;
-        }
-        case 'object': {
-          const items = await this.fetchAllPages<Photo>(
-            page =>
-              `${base}/${MUNICIPALITY_ID}/photos${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT, { objectType: 'Föremål' })}`,
-            'photos',
-          );
-          docs = mapPhotosToDocuments(items);
-          break;
-        }
-        case 'audio': {
-          const items = await this.fetchAllPages<Audio>(
-            page => `${base}/${MUNICIPALITY_ID}/audios${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
-            'audios',
-          );
-          docs = mapAudiosToDocuments(items);
-          break;
-        }
-        case 'text': {
-          const items = await this.fetchAllPages<Text>(
-            page => `${base}/${MUNICIPALITY_ID}/texts${buildUpstreamQuery(query, page, UPSTREAM_PAGE_LIMIT)}`,
-            'texts',
-          );
-          docs = mapTextsToDocuments(items);
-          break;
-        }
-      }
-    } catch (e) {
-      logger.warn(`Failed to populate cache for source=${source} query=${query || ''}: ${(e as Error).message}`);
-      // Don't poison the cache with a partial result — return empty and retry next request.
-      return [];
-    }
-    return docs;
-  }
-
-  /**
-   * Trigger a background warm of the empty-query cache for all four sources.
-   * Call once at app start so the first user doesn't pay the warm cost.
-   * Errors are swallowed so a slow upstream doesn't crash the server boot.
-   */
-  async warmCache(): Promise<void> {
-    logger.info('Warming document cache (background)…');
-    const t0 = Date.now();
-    try {
-      await Promise.all([
-        this.fetchSource('film', undefined),
-        this.fetchSource('publication', undefined),
-        this.fetchSource('photo', undefined),
-        this.fetchSource('object', undefined),
-        this.fetchSource('audio', undefined),
-        this.fetchSource('text', undefined),
-      ]);
-      logger.info(`Document cache warm complete in ${Date.now() - t0}ms`);
-    } catch (e) {
-      logger.warn(`Document cache warm failed: ${(e as Error).message}`);
-    }
-  }
-
-  /**
-   * Unified search across films, publications, photos and objects.
-   *
-   * All paging slices a fully-cached, fully-sorted in-memory list — accurate
-   * `totalPages`, exactly `pageSize` items per page, type filter is just a
-   * different cache slice.
+   * Sorting, pagination and the per-type counts all come from upstream, so a
+   * page of results costs exactly one request no matter how many types match.
    */
   @Get('/documents')
+  @OpenAPI({
+    summary: 'Search objects and registers with filters, sorting and counts per type, category and institution',
+  })
   async searchDocuments(
     @QueryParam('query') query: string,
     @QueryParam('page') page: number = 1,
@@ -290,69 +165,100 @@ export class DocumentController {
     @QueryParam('type') type: string,
     @QueryParam('sortBy') sortBy: string,
     @QueryParam('sortDirection') sortDirection: string,
+    @QueryParam('yearFrom') yearFrom: number,
+    @QueryParam('yearTo') yearTo: number,
+    @QueryParam('place') place: string,
+    @QueryParam('creator') creator: string,
+    @QueryParam('gender') gender: string,
+    @QueryParam('organisation') organisation: string,
+    @QueryParam('category') category: string,
+    @QueryParam('institution') institution: string,
     @Res() response: Response,
   ) {
-    const trimmedQuery = query?.trim() || undefined;
+    const safePageSize = Math.max(1, pageSize);
+    const safePage = Math.max(1, page);
 
-    // Always warm all sources so chip counts stay accurate even when a
-    // type filter is selected.
-    const [films, publications, photos, objects, audios, texts] = await Promise.all([
-      this.fetchSource('film', trimmedQuery),
-      this.fetchSource('publication', trimmedQuery),
-      this.fetchSource('photo', trimmedQuery),
-      this.fetchSource('object', trimmedQuery),
-      this.fetchSource('audio', trimmedQuery),
-      this.fetchSource('text', trimmedQuery),
-    ]);
-
-    // Type filter narrows which cache slice we paginate over.
-    let docs: Document[];
-    switch (type) {
-      case 'Film':
-        docs = [...films];
-        break;
-      case 'Publication':
-        docs = [...publications];
-        break;
-      case 'Photo':
-        docs = [...photos];
-        break;
-      case 'Object':
-        docs = [...objects];
-        break;
-      case 'Audio':
-        docs = [...audios];
-        break;
-      case 'Text':
-        docs = [...texts];
-        break;
-      default:
-        docs = [...films, ...publications, ...photos, ...objects, ...audios, ...texts];
+    const params = new URLSearchParams();
+    params.set('page', String(safePage));
+    params.set('limit', String(safePageSize));
+    const upstreamSort = toUpstreamSort(sortBy);
+    if (upstreamSort) {
+      params.set('sortBy', upstreamSort);
+      params.set('sortDirection', toUpstreamDirection(upstreamSort, sortDirection));
     }
 
-    if (sortBy) sortDocuments(docs, sortBy, sortDirection || 'desc');
+    const trimmedQuery = query?.trim();
+    if (trimmedQuery) params.set('query', trimmedQuery);
+    if (yearFrom) params.set('yearFrom', String(yearFrom));
+    if (yearTo) params.set('yearTo', String(yearTo));
 
-    const total = docs.length;
-    const safePageSize = Math.max(1, pageSize);
-    const totalPages = Math.max(1, Math.ceil(total / safePageSize));
-    const safePage = Math.min(Math.max(1, page), totalPages);
-    const start = (safePage - 1) * safePageSize;
-    const slice = docs.slice(start, start + safePageSize);
+    appendIds(params, 'topographyId', place);
+    if (creator?.trim()) params.set('creator', creator.trim());
+    if (gender?.trim()) params.set('gender', gender.trim());
+    appendIds(params, 'archiveCreatorLegalEntityId', organisation);
+    appendIds(params, 'categoryId', category);
+    appendIds(params, 'institutionId', institution);
+
+    for (const objectType of upstreamObjectTypes(type, gender)) {
+      params.append('objectType', objectType);
+    }
+
+    const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/objects?${params.toString()}`;
+    const res = await this.apiService.get<CombinedObjectResponse>({ url });
+    const {
+      objects = [],
+      typeCounts,
+      categoryCounts = [],
+      topographyCounts = [],
+      institutionCounts = [],
+      _meta,
+    } = res.data;
+
+    const documents = mapCombinedObjectsToDocuments(objects);
+    const collections = await Promise.all(objects.map(object => getCollection(object.nodeId)));
+    documents.forEach((document, index) => {
+      document.archiveCollection = collections[index]?.archive;
+    });
 
     return response.send({
-      data: slice,
-      total,
-      totalPages,
-      filmTotal: films.length,
-      publicationTotal: publications.length,
-      photoTotal: photos.length,
-      objectTotal: objects.length,
-      audioTotal: audios.length,
-      textTotal: texts.length,
-      page: safePage,
-      pageSize: safePageSize,
+      data: documents,
+      total: _meta?.totalRecords ?? objects.length,
+      totalPages: _meta?.totalPages ?? 1,
+      filmTotal: countFor(typeCounts, 'Film'),
+      publicationTotal: countFor(typeCounts, 'Publikation'),
+      photoTotal: countFor(typeCounts, 'Foto'),
+      objectTotal: countFor(typeCounts, 'Föremål'),
+      audioTotal: countFor(typeCounts, 'Ljud'),
+      textTotal: countFor(typeCounts, 'Text'),
+      personTotal: countFor(typeCounts, 'Person'),
+      censusTotal: countFor(typeCounts, 'Mantal'),
+      seamanTotal: countFor(typeCounts, 'Sjöman'),
+      legalEntityTotal: countFor(typeCounts, 'Juridisk person'),
+      categoryCounts: categoryCounts.map(({ categoryId, name, count }) => ({ id: categoryId, name, count })),
+      placeCounts: topographyCounts.map(({ topographyId, name, count }) => ({ id: topographyId, name, count })),
+      institutionCounts: institutionCounts.map(({ institutionId, name, count }) => ({
+        id: institutionId,
+        name,
+        count,
+      })),
+      page: _meta?.page ?? safePage,
+      pageSize: _meta?.limit ?? safePageSize,
       message: 'success',
     });
+  }
+
+  /**
+   * A biography or history text. Rare, and not always readable upstream, so any
+   * failure leaves the text out rather than failing the whole object view.
+   */
+  private async fetchLongText(filename: string | null, url: string): Promise<string | undefined> {
+    if (!filename) return undefined;
+    try {
+      const res = await this.apiService.get<string>({ url, responseType: 'text', timeout: LONG_TEXT_TIMEOUT_MS });
+      return cleanHtml(res.data);
+    } catch {
+      return undefined;
+    }
   }
 
   // Validate and extract the numeric suffix from a composite document ID like
@@ -367,45 +273,106 @@ export class DocumentController {
    * Fetch a single document by composite id (film-N / publ-N / photo-N).
    */
   @Get('/documents/:id')
+  @OpenAPI({ summary: 'Get one object or register record by its composite id' })
   async getDocumentById(@Param('id') id: string, @Res() response: Response) {
     const base = getApiBase('memories');
 
     if (id.startsWith('publ-')) {
       const publId = this.extractNumericId(id, 'publ-');
       const res = await this.apiService.get<Publication>({ url: `${base}/${MUNICIPALITY_ID}/publications/${publId}` });
-      return response.send({ data: mapPublicationToDocument(res.data), message: 'success' });
+      const document = await withCollection(mapPublicationToDocument(res.data), res.data.nodeId);
+      return response.send({
+        data: await withTextPreview(document, `${base}/${MUNICIPALITY_ID}/publications/${publId}/file?variant=text`),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('photo-')) {
       const photoId = this.extractNumericId(id, 'photo-');
       const res = await this.apiService.get<Photo>({ url: `${base}/${MUNICIPALITY_ID}/photos/${photoId}` });
-      return response.send({ data: mapPhotoToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapPhotoToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('audio-')) {
       const audioId = this.extractNumericId(id, 'audio-');
       const res = await this.apiService.get<Audio>({ url: `${base}/${MUNICIPALITY_ID}/audios/${audioId}` });
-      return response.send({ data: mapAudioToDocument(res.data), message: 'success' });
+      return response.send({
+        data: await withCollection(mapAudioToDocument(res.data), res.data.nodeId),
+        message: 'success',
+      });
     }
 
     if (id.startsWith('text-')) {
       const textId = this.extractNumericId(id, 'text-');
       const res = await this.apiService.get<Text>({ url: `${base}/${MUNICIPALITY_ID}/texts/${textId}` });
-      return response.send({ data: mapTextToDocument(res.data), message: 'success' });
+      const document = await withCollection(mapTextToDocument(res.data), res.data.nodeId);
+      return response.send({
+        data: await withTextPreview(document, `${base}/${MUNICIPALITY_ID}/texts/${textId}/file?variant=text`),
+        message: 'success',
+      });
+    }
+
+    if (id.startsWith('mantal-')) {
+      const censusId = id.slice('mantal-'.length);
+      if (!/^\d{4}-\d+$/.test(censusId)) throw new HttpException(400, `Invalid document id: ${id}`);
+
+      const res = await this.apiService.get<CensusRecord>({
+        url: `${base}/${MUNICIPALITY_ID}/census-records/${censusId}`,
+      });
+      return response.send({ data: mapCensusRecordToDocument(res.data), message: 'success' });
+    }
+
+    if (id.startsWith('person-')) {
+      const personId = this.extractNumericId(id, 'person-');
+      const res = await this.apiService.get<Person>({ url: `${base}/${MUNICIPALITY_ID}/persons/${personId}` });
+      const longText = await this.fetchLongText(
+        res.data.biographyFilename,
+        `${base}/${MUNICIPALITY_ID}/persons/${personId}/biography`,
+      );
+      return response.send({ data: { ...mapPersonToDocument(res.data), longText }, message: 'success' });
+    }
+
+    if (id.startsWith('jurpers-')) {
+      const legalEntityId = this.extractNumericId(id, 'jurpers-');
+      const res = await this.apiService.get<LegalEntityRecord>({
+        url: `${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}`,
+      });
+      const longText = await this.fetchLongText(
+        res.data.historyFilename,
+        `${base}/${MUNICIPALITY_ID}/legal-entities/${legalEntityId}/history`,
+      );
+      return response.send({ data: { ...mapLegalEntityToDocument(res.data), longText }, message: 'success' });
+    }
+
+    if (id.startsWith('sjoman-')) {
+      const seamanId = this.extractNumericId(id, 'sjoman-');
+      const res = await this.apiService.get<Seaman>({ url: `${base}/${MUNICIPALITY_ID}/seamen/${seamanId}` });
+      return response.send({ data: mapSeamanToDocument(res.data), message: 'success' });
+    }
+
+    if (/^[a-z]+-/.test(id) && !id.startsWith('film-')) {
+      throw new HttpException(404, 'Not found');
     }
 
     const filmId = this.extractNumericId(id.startsWith('film-') ? id : `film-${id}`, 'film-');
     const res = await this.apiService.get<Film>({ url: `${base}/${MUNICIPALITY_ID}/films/${filmId}` });
-    return response.send({ data: mapFilmToDocument(res.data), message: 'success' });
+    return response.send({
+      data: await withCollection(mapFilmToDocument(res.data), res.data.nodeId),
+      message: 'success',
+    });
   }
 
   /**
    * Pipe a file from the upstream samba share through this proxy without
    * buffering. Important for the Film endpoint where individual records can
-   * be 40+ MB AVI files — buffering them in memory would OOM the proxy in
+   * be large AVI files — buffering them in memory would OOM the proxy in
    * the same way Logbook OOMs the upstream when it wraps the response.
    */
   @Get('/documents/:id/file')
+  @OpenAPI({ summary: 'Get the file of an object in the requested variant' })
   async getDocumentFile(
     @Param('id') id: string,
     @QueryParam('variant') variant: string,
@@ -448,6 +415,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
+    response.setHeader('Cache-Control', fileCacheControl(upstream.headers['cache-control'] as string | undefined));
     // Preserve 206 when upstream serves a partial response.
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
@@ -460,6 +428,7 @@ export class DocumentController {
    * per-media endpoint (`/texts/{id}/media/{mediaId}/file`) added in memories 3.4.
    */
   @Get('/documents/:id/media/:mediaId/file')
+  @OpenAPI({ summary: 'Get one extra media file of a text' })
   async getDocumentMediaFile(
     @Param('id') id: string,
     @Param('mediaId') mediaId: string,
@@ -489,6 +458,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
+    response.setHeader('Cache-Control', fileCacheControl(upstream.headers['cache-control'] as string | undefined));
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
     return response;
@@ -506,6 +476,7 @@ export class DocumentController {
    * on `/file` directly so the browser can render them in-page.)
    */
   @Get('/documents/:id/stream')
+  @OpenAPI({ summary: 'Stream the audio or film of an object' })
   async streamDocument(@Param('id') id: string, @HeaderParam('range') range: string, @Res() response: Response) {
     const base = getApiBase('memories');
     let url: string;
@@ -528,6 +499,7 @@ export class DocumentController {
       const value = upstream.headers[header];
       if (value) response.setHeader(header, value as string);
     }
+    response.setHeader('Cache-Control', fileCacheControl(upstream.headers['cache-control'] as string | undefined));
     response.status(upstream.status);
     (upstream.data as NodeJS.ReadableStream).pipe(response);
     return response;

@@ -18,7 +18,7 @@ module.exports = {
     '!**/src/app/**',
     '!**/src/interfaces/**',
     '!**/src/data-contracts/**',
-    '!**/src/middleware.ts',
+    '!**/src/proxy.ts',
     '!**/src/swagger-typescript-api.ts',
   ],
   moduleDirectories: ['node_modules'],

@@ -1,0 +1,85 @@
+import { Controller, Get, Param, QueryParam, Res } from 'routing-controllers';
+import { OpenAPI } from 'routing-controllers-openapi';
+import { Response } from 'express';
+import { ApiService } from '@services/api.service';
+import { HttpException } from '@/exceptions/HttpException';
+import { MUNICIPALITY_ID } from '@/config';
+import { getApiBase } from '@/config/api-config';
+
+interface UpstreamLegalEntity {
+  legalEntityId: number;
+  name: string | null;
+  category: string | null;
+}
+
+interface PagedLegalEntityResponse {
+  legalEntities?: UpstreamLegalEntity[];
+  _meta?: { totalRecords?: number };
+}
+
+export interface Organisation {
+  id: number;
+  name: string;
+  category?: string;
+}
+
+const PAGE_SIZE = 20;
+
+const toOrganisation = (entity: UpstreamLegalEntity): Organisation => ({
+  id: entity.legalEntityId,
+  name: entity.name || '(utan namn)',
+  category: entity.category || undefined,
+});
+
+@Controller()
+export class LegalEntityController {
+  private readonly apiService = new ApiService();
+
+  /** Search archive creators by name, for the Arkivbildare filter's picker. Only ones with objects are offered. */
+  @Get('/organisations')
+  @OpenAPI({ summary: 'Search archive creators with objects by name for the archive creator filter' })
+  async searchOrganisations(
+    @QueryParam('name') name: string,
+    @QueryParam('page') page: number,
+    @QueryParam('limit') limit: number,
+    @Res() response: Response,
+  ) {
+    const trimmed = name?.trim();
+    if (!trimmed) {
+      return response.send({ data: [], total: 0, message: 'success' });
+    }
+
+    const params = new URLSearchParams({
+      page: String(Math.max(1, page || 1)),
+      limit: String(Math.min(Math.max(1, limit || PAGE_SIZE), 100)),
+      sortBy: 'name',
+      sortDirection: 'ASC',
+      name: trimmed,
+      archiveCreatorWithObjects: 'true',
+    });
+
+    const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/legal-entities?${params.toString()}`;
+    const res = await this.apiService.get<PagedLegalEntityResponse>({ url });
+
+    return response.send({
+      data: (res.data.legalEntities ?? []).map(toOrganisation),
+      total: res.data._meta?.totalRecords ?? 0,
+      message: 'success',
+    });
+  }
+
+  /**
+   * One organisation by id. The filter keeps only ids in the URL, so a shared
+   * link has to look the names back up to label its chips.
+   */
+  @Get('/organisations/:id')
+  @OpenAPI({ summary: 'Get one organisation by id' })
+  async getOrganisationById(@Param('id') id: string, @Res() response: Response) {
+    if (!/^\d+$/.test(id)) throw new HttpException(400, `Invalid organisation id: ${id}`);
+
+    const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/legal-entities/${id}`;
+    const res = await this.apiService.get<UpstreamLegalEntity>({ url });
+
+    return response.send({ data: toOrganisation(res.data), message: 'success' });
+  }
+}
