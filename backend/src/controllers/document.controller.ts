@@ -195,7 +195,7 @@ export class DocumentController {
     appendIds(params, 'topographyId', place);
     if (creator?.trim()) params.set('creator', creator.trim());
     if (gender?.trim()) params.set('gender', gender.trim());
-    appendIds(params, 'creatorLegalEntityId', organisation);
+    appendIds(params, 'archiveCreatorLegalEntityId', organisation);
     appendIds(params, 'categoryId', category);
     appendIds(params, 'institutionId', institution);
 

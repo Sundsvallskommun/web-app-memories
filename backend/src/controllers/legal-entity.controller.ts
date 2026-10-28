@@ -35,9 +35,9 @@ const toOrganisation = (entity: UpstreamLegalEntity): Organisation => ({
 export class LegalEntityController {
   private readonly apiService = new ApiService();
 
-  /** Search organisations by name, for the Arkivbildare filter's picker. */
+  /** Search archive creators by name, for the Arkivbildare filter's picker. Only ones with objects are offered. */
   @Get('/organisations')
-  @OpenAPI({ summary: 'Search organisations by name for the archive creator filter' })
+  @OpenAPI({ summary: 'Search archive creators with objects by name for the archive creator filter' })
   async searchOrganisations(
     @QueryParam('name') name: string,
     @QueryParam('page') page: number,
@@ -55,6 +55,7 @@ export class LegalEntityController {
       sortBy: 'name',
       sortDirection: 'ASC',
       name: trimmed,
+      archiveCreatorWithObjects: 'true',
     });
 
     const url = `${getApiBase('memories')}/${MUNICIPALITY_ID}/legal-entities?${params.toString()}`;
