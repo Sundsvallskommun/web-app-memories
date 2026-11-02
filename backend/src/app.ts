@@ -49,6 +49,7 @@ export class App {
   }
 
   private initializeMiddlewares() {
+    this.app.set('trust proxy', true);
     this.app.use(morgan(LOG_FORMAT, { stream }));
     this.app.use(hpp());
     this.app.use(

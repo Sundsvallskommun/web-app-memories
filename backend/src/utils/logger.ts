@@ -1,6 +1,6 @@
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
-import { LOG_DIR } from '@/config';
+import { LOG_DIR, NODE_ENV } from '@/config';
 
 const logDir = LOG_DIR || './data/logs';
 
@@ -29,8 +29,13 @@ export const logger = winston.createLogger({
       json: false,
       zippedArchive: true,
     }),
+    // Colours only locally: on OpenShift stdout is the log people read (pod logs, log
+    // collection), and colour codes show up there as noise like [32minfo[39m.
     new winston.transports.Console({
-      format: winston.format.combine(winston.format.splat(), winston.format.colorize()),
+      format:
+        NODE_ENV === 'development'
+          ? winston.format.combine(winston.format.splat(), winston.format.colorize())
+          : winston.format.splat(),
     }),
   ],
 });
