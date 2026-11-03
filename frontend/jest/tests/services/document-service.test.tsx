@@ -1,4 +1,5 @@
-import { searchDocuments } from '@services/document-service';
+import { getDocumentById, searchDocuments } from '@services/document-service';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { apiService } from '@services/api-service';
 
 jest.mock('@services/api-service', () => ({
@@ -47,5 +48,30 @@ describe('document-service.searchDocuments', () => {
     expect(result.textTotal).toBe(0);
     expect(result.filmTotal).toBe(0);
     expect(result.documents).toEqual([]);
+  });
+});
+
+describe('document-service.getDocumentById', () => {
+  beforeEach(() => mockGet.mockReset());
+
+  const failWith = (status: number) =>
+    new AxiosError('failed', String(status), undefined, undefined, {
+      status,
+      statusText: '',
+      data: {},
+      headers: {},
+      config: { headers: new AxiosHeaders() },
+    });
+
+  it.each([400, 404])('returns null when the API answers %i', async (status) => {
+    mockGet.mockRejectedValue(failWith(status));
+
+    await expect(getDocumentById('info')).resolves.toBeNull();
+  });
+
+  it('throws when the API is unreachable, so the page can offer a retry', async () => {
+    mockGet.mockRejectedValue(failWith(502));
+
+    await expect(getDocumentById('text-1')).rejects.toThrow('failed');
   });
 });

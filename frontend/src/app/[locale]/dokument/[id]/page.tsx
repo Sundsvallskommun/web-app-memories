@@ -109,8 +109,9 @@ const DocumentDetailPage: React.FC = () => {
     return (
       <DefaultLayout>
         <Main>
-          <div className="flex flex-col items-center gap-16 py-32">
-            <p>Dokumentet hittades inte.</p>
+          <div className="flex flex-col items-center gap-16 py-32 text-center" data-cy="document-not-found">
+            <h1 className="text-h4-md">Dokumentet finns inte</h1>
+            <p>Länken kan vara felaktig eller gammal. Prova att söka efter dokumentet i stället.</p>
             <Button variant="tertiary" leftIcon={<ArrowLeft size={16} />} onClick={() => router.push('/')}>
               Tillbaka till sökningen
             </Button>
