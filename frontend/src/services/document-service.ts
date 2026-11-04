@@ -82,7 +82,8 @@ export const getDocumentById = async (id: string): Promise<Document | null> => {
     const response = await apiService.get<{ data: Document; message: string }>(`documents/${id}`);
     return response?.data?.data || null;
   } catch (e) {
-    if (axios.isAxiosError(e) && e.response?.status === 404) return null;
+    // 400 means the id itself is malformed, which for the visitor is the same as not found.
+    if (axios.isAxiosError(e) && (e.response?.status === 400 || e.response?.status === 404)) return null;
     throw e;
   }
 };
